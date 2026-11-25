@@ -186,10 +186,14 @@ async function knoop(nums){
   const c = pos || [map.getCenter().lat, map.getCenter().lng];
   msg('Knooppunten zoeken…');
   try{
-    const re = [...new Set(nums)].join('|');
-    const qs = `[out:json][timeout:25];node["rcn_ref"~"^(${re})$"](around:30000,${c[0]},${c[1]});out;`;
-    const r = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(qs)});
-    const els = (await r.json()).elements || [];
+    const parts = [...new Set(nums)].map(n => `node["rcn_ref"="${n}"](around:30000,${c[0]},${c[1]});`).join('');
+    const qs = `[out:json][timeout:20];(${parts});out;`;
+    const servers = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+                     'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 25000);
+    const els = await Promise.any(servers.map(u => fetch(u, {method:'POST', body:'data=' + encodeURIComponent(qs), signal:ctl.signal})
+      .then(r => { if(!r.ok) throw 0; return r.json(); }).then(j => { if(!j.elements) throw 0; return j.elements; })));
+    ctl.abort(); clearTimeout(tm);
     let prev = c; const pts = [];
     for(const n of nums){
       const cands = els.filter(e => e.tags && e.tags.rcn_ref === n);
