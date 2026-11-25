@@ -102,7 +102,7 @@
 </div>
 
 <form class="search" id="searchForm">
-  <input id="q" type="search" placeholder="📍 Bestemming (plaats, adres…)" autocomplete="off">
+  <input id="q" type="search" placeholder="📍 Bestemming of knooppunten (bv. 23 45 12)" autocomplete="off">
   <button class="small" type="submit">Zoek</button>
 </form>
 <ul id="results"></ul>
@@ -148,7 +148,7 @@ const overlay = L.tileLayer('https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y
 const trackLine = L.polyline([], {color:'#e0457b', weight:5}).addTo(map);
 const routeLine = L.polyline([], {color:'#2f7cf6', weight:5, opacity:.75, dashArray:'8 8'}).addTo(map);
 const me = L.circleMarker([0,0], {radius:8, color:'#fff', weight:3, fillColor:'#2f7cf6', fillOpacity:1});
-let destMarker = null, follow = true;
+let destMarker = null, follow = true; const viaLayer = L.layerGroup().addTo(map);
 map.on('dragstart', () => setFollow(false));
 function setFollow(f){ follow = f; $('followBtn').classList.toggle('on', f); $('follow2').classList.toggle('on', f); if(f && pos) map.setView(pos, Math.max(map.getZoom(), 15)); }
 function setOverlay(on){ S.overlay = on;
@@ -164,7 +164,10 @@ function drawTrack(){ trackLine.setLatLngs(S.track.map(seg => seg.map(p => [p[0]
 /* ---------- Bestemming ---------- */
 $('searchForm').onsubmit = async e => {
   e.preventDefault(); const q = $('q').value.trim(); if(!q) return;
-  msg('Zoeken…'); $('results').innerHTML = '';
+  $('results').innerHTML = '';
+  const nums = q.replace(/knooppunt(en)?|kp/gi, ' ').trim().split(/[\s,\-–>]+/).filter(Boolean);
+  if(nums.length && nums.every(n => /^\d{1,3}$/.test(n))) return knoop(nums);
+  msg('Zoeken…');
   try{
     const near = pos ? `&viewbox=${pos[1]-.5},${pos[0]+.5},${pos[1]+.5},${pos[0]-.5}` : '';
     const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=nl,be,de&accept-language=nl${near}&q=${encodeURIComponent(q)}`);
@@ -178,8 +181,35 @@ $('searchForm').onsubmit = async e => {
     });
   }catch(err){ msg('Zoeken mislukt — geen internet?'); }
 };
+/* Knooppunten (fietsknooppuntennetwerk) via OpenStreetMap/Overpass */
+async function knoop(nums){
+  const c = pos || [map.getCenter().lat, map.getCenter().lng];
+  msg('Knooppunten zoeken…');
+  try{
+    const re = [...new Set(nums)].join('|');
+    const qs = `[out:json][timeout:25];node["rcn_ref"~"^(${re})$"](around:30000,${c[0]},${c[1]});out;`;
+    const r = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:'data=' + encodeURIComponent(qs)});
+    const els = (await r.json()).elements || [];
+    let prev = c; const pts = [];
+    for(const n of nums){
+      const cands = els.filter(e => e.tags && e.tags.rcn_ref === n);
+      if(!cands.length){ msg(`Knooppunt ${n} niet gevonden binnen 30 km.`); return; }
+      cands.sort((a,b) => dist(prev,[a.lat,a.lon]) - dist(prev,[b.lat,b.lon]));
+      prev = [cands[0].lat, cands[0].lon]; pts.push(prev);
+    }
+    $('q').value = '';
+    const end = pts.pop();
+    S.dest = {name:'Knooppunt ' + nums.join(' → '), lat:end[0], lon:end[1], via:pts, route:null, cum:null};
+    save(true); showDest(true); msg('');
+    if(pos) await planRoute(); else msg('Knooppunten gevonden — route volgt zodra er gps is.');
+  }catch(e){ msg('Knooppunten zoeken mislukt — geen internet? Probeer het zo nog eens.'); }
+}
+map.on('contextmenu', e => {                       // lang drukken op de kaart
+  L.popup().setLatLng(e.latlng).setContent('<button id="goHere" style="font:inherit;font-weight:650;border:0;border-radius:10px;padding:10px 14px;background:#7ee08a;color:#0b2410">📍 Hierheen fietsen</button>').openOn(map);
+  setTimeout(() => { const b = document.getElementById('goHere'); if(b) b.onclick = () => { map.closePopup(); setDest('Gekozen punt op de kaart', e.latlng.lat, e.latlng.lng); }; }, 0);
+});
 async function setDest(name, lat, lon){
-  S.dest = {name, lat, lon, route:null, cum:null}; save(true); showDest();
+  S.dest = {name, lat, lon, via:[], route:null, cum:null}; save(true); showDest();
   if(!pos){ msg('Bestemming gezet — route volgt zodra er gps is.'); return; }
   await planRoute();
 }
@@ -187,7 +217,7 @@ async function planRoute(){
   if(!S.dest || !pos) return;
   msg('Fietsroute berekenen…');
   try{
-    const u = `https://brouter.de/brouter?lonlats=${pos[1]},${pos[0]}|${S.dest.lon},${S.dest.lat}&profile=trekking&alternativeidx=0&format=geojson`;
+    const u = `https://brouter.de/brouter?lonlats=${[pos, ...(S.dest.via||[]), [S.dest.lat, S.dest.lon]].map(p => p[1]+','+p[0]).join('|')}&profile=trekking&alternativeidx=0&format=geojson`;
     const g = await (await fetch(u)).json();
     const route = g.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
     const cum = [0]; for(let i=1;i<route.length;i++) cum.push(cum[i-1] + dist(route[i-1], route[i]));
@@ -207,6 +237,8 @@ function remaining(){
 function showDest(fit){
   const d = S.dest; $('destBar').classList.toggle('on', !!d);
   if(destMarker){ map.removeLayer(destMarker); destMarker = null; }
+  viaLayer.clearLayers();
+  (d && d.via || []).forEach(v => L.circleMarker(v, {radius:7, color:'#fff', weight:2, fillColor:'#2f7cf6', fillOpacity:1}).addTo(viaLayer));
   routeLine.setLatLngs(d && d.route ? d.route : []);
   if(!d) return;
   $('destName').textContent = '→ ' + d.name;
@@ -230,6 +262,7 @@ function onFix(p){
   pos = here; me.setLatLng(here); if(!map.hasLayer(me)) me.addTo(map);
   if(follow) map.setView(here, Math.max(map.getZoom(), 16), {animate:false});
   gpsStatus(`± ${Math.round(c.accuracy)} m`, c.accuracy <= 10 ? 'var(--go)' : c.accuracy <= MAXACC ? 'var(--warn)' : 'var(--stop)');
+  if(S.dest && S.dest.via && S.dest.via.length && dist(here, S.dest.via[0]) < 60){ S.dest.via.shift(); save(true); showDest(); }  // knooppunt gepasseerd
   if(S.dest && !S.dest.route && !S.dest.triedRoute){ S.dest.triedRoute = true; planRoute(); }
   if(c.accuracy > MAXACC){ render(); return; }
 

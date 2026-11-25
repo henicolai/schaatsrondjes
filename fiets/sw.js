@@ -13,7 +13,7 @@ self.addEventListener('fetch', e => {
   const url = e.request.url;
   if (e.request.method !== 'GET') return;
   // kaarttegels, zoeken en routes altijd live ophalen
-  if (/tile\.|nominatim|brouter/.test(url)) return;
+  if (/tile|nominatim|brouter|overpass/.test(url)) return;
   if (e.request.mode === 'navigate') {   // pagina: eerst online (nieuwste versie), offline uit cache
     e.respondWith(fetch(e.request.url, {cache:'no-cache'}).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })
       .catch(() => caches.match(e.request).then(r => r || caches.match('index.html'))));
