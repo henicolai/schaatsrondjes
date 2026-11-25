@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1620">
+<title>Schaatsrondjes</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{--bg:#0b1620;--card:#13232f;--line:#22394a;--txt:#eaf4fb;--dim:#8aa6b8;--ice:#7fd3ff;--go:#3ddc97;--stop:#ff6b6b;--best:#ffd166}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       padding:calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 16px);user-select:none}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.3px}
+  #gps{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  #gps i{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}
+  .big{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+  .lbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+  .val{font-variant-numeric:tabular-nums;font-weight:700;line-height:1.05;margin-top:4px}
+  #laps{font-size:64px;color:var(--ice)}
+  #dist{font-size:44px;margin-top:14px}
+  #dist small{font-size:20px;color:var(--dim);font-weight:500}
+  .wide{grid-column:1/-1}
+  #cur{font-size:56px}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  .row3 .val{font-size:22px}
+  #best{color:var(--best)}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  button{font:inherit;border:0;border-radius:14px;padding:16px 10px;font-size:18px;font-weight:650;color:var(--txt);background:var(--line)}
+  button:active{transform:scale(.98)}
+  #startBtn{background:var(--go);color:#062b1b}
+  #startBtn.stop{background:var(--stop);color:#330808}
+  #lapBtn{grid-column:1/-1;background:var(--ice);color:#04263a;font-size:26px;padding:26px 10px}
+  #lapBtn:disabled{opacity:.35}
+  .small{font-size:15px;padding:12px 8px}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;margin-top:12px}
+  .seg button{flex:1;background:none;font-size:14px;padding:10px 6px;border-radius:9px;color:var(--dim)}
+  .seg button.on{background:var(--line);color:var(--txt)}
+  .settings{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:14px;color:var(--dim);flex-wrap:wrap}
+  .settings input{width:76px;font:inherit;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  #msg{min-height:20px;font-size:13px;color:var(--dim);margin-top:10px;text-align:center}
+  ol{list-style:none;padding:0;margin:12px 0 0;max-height:none}
+  li{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:17px}
+  li span:first-child{color:var(--dim)}
+  li.best span:last-child{color:var(--best);font-weight:700}
+  #lock{position:fixed;inset:0;background:rgba(5,12,18,.55);display:none;align-items:flex-end;justify-content:center;
+        padding-bottom:calc(env(safe-area-inset-bottom) + 40px);z-index:10;touch-action:none}
+  #lock.on{display:flex}
+  #unlock{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:40px;padding:18px 28px;font-size:16px}
+  #unlock b{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(127,211,255,.25)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⛸️ Schaatsrondjes</h1>
+  <div id="gps"><i></i><span>gps uit</span></div>
+</header>
+
+<div class="big">
+  <div class="card"><div class="lbl">Rondjes</div><div class="val" id="laps">0</div></div>
+  <div class="card"><div class="lbl">Afstand</div><div class="val" id="dist">0,00<small> km</small></div></div>
+  <div class="card wide">
+    <div class="lbl">Huidige ronde</div><div class="val" id="cur">–</div>
+    <div class="row3">
+      <div><div class="lbl">Laatste</div><div class="val" id="last">–</div></div>
+      <div><div class="lbl">Snelste</div><div class="val" id="best">–</div></div>
+      <div><div class="lbl">Gemiddeld</div><div class="val" id="avg">–</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="btns">
+  <button id="lapBtn" disabled>Ronde +1</button>
+  <button id="startBtn">Start</button>
+  <button id="lockBtn">🔒 Vergrendel</button>
+  <button id="undoBtn" class="small">↶ Laatste ronde weg</button>
+  <button id="finishBtn" class="small">📍 Finish hier</button>
+</div>
+
+<div class="seg" id="mode">
+  <button data-m="gps">Automatisch (gps)</button>
+  <button data-m="manual">Handmatig / binnen</button>
+</div>
+<div class="settings">
+  <label>Rondelengte <input id="lapLen" type="number" min="50" max="1000" step="1"> m</label>
+  <span>· totaal <b id="total">0:00</b></span>
+  <button id="resetBtn" class="small" style="margin-left:auto">Wissen</button>
+</div>
+<div id="msg"></div>
+
+<ol id="list"></ol>
+
+<div id="lock"><button id="unlock"><b></b>Houd ingedrukt om te ontgrendelen</button></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'schaatsrondjes-v1';
+const NEAR = 25, FAR = 60, MINLAP = 20000, MAXACC = 40, TAG = 'schaatsrondjes';
+
+let S = load() || {};
+S = Object.assign({running:false, start:null, laps:[], finish:null, lapLen:400, mode:'gps'}, S);
+let geoId = null, wake = null, lastFix = null, resetArmed = 0;
+let det = freshDet();
+function freshDet(){ return {armed:false, inZone:false, minD:Infinity, minT:0}; }
+
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
+function msg(t){ $('msg').textContent = t || ''; }
+
+function lapTimes(){ const a=[]; let p=S.start; for(const t of S.laps){ a.push(t-p); p=t; } return a; }
+function fmt(ms){
+  if(ms==null || !isFinite(ms)) return '–';
+  const s = ms/1000, m = Math.floor(s/60), r = s - m*60;
+  return (m ? `${m}:${r.toFixed(1).padStart(4,'0')}` : r.toFixed(1)).replace('.', ',');
+}
+function fmtTotal(ms){ const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60;
+  return (h? h+':'+String(m).padStart(2,'0') : m) + ':' + String(x).padStart(2,'0'); }
+function km(){ return (S.laps.length * S.lapLen / 1000).toFixed(2).replace('.', ','); }
+
+function stats(){
+  const lt = lapTimes();
+  return { lt, last: lt.at(-1), best: lt.length ? Math.min(...lt) : null,
+           avg: lt.length ? lt.reduce((a,b)=>a+b,0)/lt.length : null };
+}
+
+function render(){
+  const {lt, last, best, avg} = stats();
+  $('laps').textContent = S.laps.length;
+  $('dist').innerHTML = km() + '<small> km</small>';
+  $('last').textContent = fmt(last);
+  $('best').textContent = fmt(best);
+  $('avg').textContent = fmt(avg);
+  $('list').innerHTML = lt.map((t,i)=>`<li class="${t===best?'best':''}"><span>Ronde ${i+1}</span><span>${fmt(t)}</span></li>`).reverse().join('');
+  const btn = $('startBtn');
+  btn.textContent = S.running ? 'Stop' : (S.start ? 'Nieuwe sessie' : 'Start');
+  btn.classList.toggle('stop', S.running);
+  $('lapBtn').disabled = !S.running;
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === S.mode));
+  $('lapLen').value = S.lapLen;
+  tick();
+}
+
+function tick(){
+  if(!S.start){ $('cur').textContent='–'; $('total').textContent='0:00'; return; }
+  const end = S.running ? Date.now() : (S.laps.at(-1) || S.start);
+  const prev = S.laps.at(-1) || S.start;
+  $('cur').textContent = S.running ? fmt(Date.now() - prev) : '–';
+  $('total').textContent = fmtTotal((S.running ? Date.now() : (S.stop || end)) - S.start);
+}
+setInterval(tick, 100);
+
+/* ---------- GPS ---------- */
+function dist(a, b){
+  const R=6371000, r=Math.PI/180, dLat=(b.lat-a.lat)*r, dLon=(b.lon-a.lon)*r;
+  const h = Math.sin(dLat/2)**2 + Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function gpsStatus(text, color){ $('gps').querySelector('span').textContent = text; $('gps').querySelector('i').style.background = color; }
+
+function onFix(pos){
+  const {latitude:lat, longitude:lon, accuracy:acc} = pos.coords;
+  let t = pos.timestamp; if(Math.abs(t - Date.now()) > 5000) t = Date.now();
+  lastFix = {lat, lon, acc};
+  gpsStatus(`± ${Math.round(acc)} m`, acc <= 12 ? 'var(--go)' : acc <= MAXACC ? 'var(--best)' : 'var(--stop)');
+  if(!S.running || S.mode !== 'gps' || acc > MAXACC) return;
+  if(!S.finish){ S.finish = {lat, lon}; save(); msg('Finishlijn vastgelegd op je startpunt.'); return; }
+  const d = dist(S.finish, {lat, lon});
+  if(!det.armed){ if(d > FAR) det.armed = true; return; }
+  if(d < NEAR){
+    det.inZone = true;
+    if(d < det.minD){ det.minD = d; det.minT = t; }
+  } else if(det.inZone){
+    addLap(det.minT, 'gps');
+  }
+}
+function startGps(){
+  if(geoId != null || !('geolocation' in navigator)) return;
+  gpsStatus('zoeken…', 'var(--best)');
+  geoId = navigator.geolocation.watchPosition(onFix, e => {
+    gpsStatus('geen gps', 'var(--stop)');
+    msg(e.code === 1 ? 'Locatietoegang geweigerd — sta locatie toe of kies Handmatig.' : 'Geen gps-signaal. Binnen? Kies Handmatig.');
+  }, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+}
+function stopGps(){ if(geoId != null){ navigator.geolocation.clearWatch(geoId); geoId = null; } gpsStatus('gps uit', '#555'); }
+
+/* ---------- Rondes ---------- */
+function addLap(t, src){
+  if(!S.running) return;
+  const prev = S.laps.at(-1) || S.start;
+  det = freshDet();
+  if(src === 'gps' && t - prev < MINLAP) return;
+  if(t - prev < 3000) return;               // dubbele tik negeren
+  S.laps.push(t); save(); render();
+  if(navigator.vibrate) navigator.vibrate(150);
+  notify();
+}
+
+/* ---------- Melding (wordt gespiegeld naar de Galaxy Watch) ---------- */
+async function notify(final){
+  if(!('Notification' in window) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
+  const reg = await navigator.serviceWorker.ready;
+  const {last, best} = stats();
+  const title = `Ronde ${S.laps.length} · ${km()} km`;
+  const body = S.laps.length ? `Laatste ${fmt(last)} s · Snelste ${fmt(best)} s` : 'Tik op Ronde +1 bij elke ronde';
+  reg.showNotification(final ? 'Klaar · ' + title : title, {
+    body: final ? `${body} · Totaal ${fmtTotal((S.stop||Date.now()) - S.start)}` : body,
+    tag: TAG, renotify: true, silent: !!final, requireInteraction: !final,
+    icon: 'icon-192.png', badge: 'icon-192.png',
+    actions: final ? [] : [{action:'lap', title:'Ronde +1'}]
+  });
+}
+async function clearNotify(){
+  if(!navigator.serviceWorker) return;
+  const reg = await navigator.serviceWorker.ready;
+  (await reg.getNotifications({tag:TAG})).forEach(n => n.close());
+}
+
+/* ---------- Scherm aan houden ---------- */
+async function keepAwake(){ try{ if('wakeLock' in navigator && S.running) wake = await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') keepAwake(); });
+
+/* ---------- Knoppen ---------- */
+$('startBtn').onclick = async () => {
+  if(S.running){
+    S.running = false; S.stop = Date.now(); save();
+    stopGps(); try{ wake && wake.release(); }catch(e){} wake = null;
+    render(); notify(true); msg('Sessie gestopt.');
+    return;
+  }
+  if('Notification' in window && Notification.permission === 'default'){
+    try{ await Notification.requestPermission(); }catch(e){}
+  }
+  S = Object.assign(S, {running:true, start:Date.now(), stop:null, laps:[], finish:null});
+  det = freshDet(); save();
+  if(S.mode === 'gps'){ startGps(); msg('Start op de finishlijn — die wordt je meetpunt.'); }
+  else msg('Tik Ronde +1 hier of op je horloge.');
+  keepAwake(); render(); notify();
+};
+$('lapBtn').onclick = () => addLap(Date.now(), 'manual');
+$('undoBtn').onclick = () => { if(S.laps.length){ S.laps.pop(); save(); render(); notify(!S.running); } };
+$('finishBtn').onclick = () => {
+  if(!lastFix){ msg('Nog geen gps-positie.'); return; }
+  S.finish = {lat:lastFix.lat, lon:lastFix.lon}; det = freshDet(); save(); msg('Finishlijn verplaatst naar hier.');
+};
+$('resetBtn').onclick = () => {
+  if(Date.now() - resetArmed > 3000){ resetArmed = Date.now(); msg('Tik nogmaals op Wissen om alles te wissen.'); return; }
+  stopGps(); S = Object.assign(S, {running:false, start:null, stop:null, laps:[], finish:null}); save(); clearNotify(); render(); msg('Gewist.');
+};
+document.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
+  S.mode = b.dataset.m; save();
+  if(S.running){ S.mode === 'gps' ? startGps() : stopGps(); }
+  render();
+});
+$('lapLen').onchange = e => { const v = Math.round(+e.target.value); if(v >= 50 && v <= 1000){ S.lapLen = v; save(); render(); notify(!S.running); } };
+
+/* Vergrendelen tegen per ongeluk tikken in je zak */
+$('lockBtn').onclick = () => $('lock').classList.add('on');
+(() => {
+  const u = $('unlock'), bar = u.querySelector('b'); let t0 = 0, raf = 0;
+  const step = () => { const p = Math.min(1, (Date.now() - t0) / 1200); bar.style.width = p*100 + '%';
+    if(p >= 1){ $('lock').classList.remove('on'); bar.style.width = 0; return; } raf = requestAnimationFrame(step); };
+  u.addEventListener('pointerdown', e => { e.preventDefault(); t0 = Date.now(); raf = requestAnimationFrame(step); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => u.addEventListener(ev, () => { cancelAnimationFrame(raf); bar.style.width = 0; }));
+})();
+
+/* Service worker: offline + knop "Ronde +1" in de melding */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js');
+  navigator.serviceWorker.addEventListener('message', e => {
+    if(e.data && e.data.type === 'lap') addLap(Date.now(), 'watch');
+  });
+}
+
+/* Herstel na herladen */
+if(S.running){ if(S.mode === 'gps') startGps(); keepAwake(); }
+render();
+</script>
+</body>
+</html>
