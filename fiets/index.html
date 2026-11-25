@@ -216,7 +216,7 @@ async function knLoad(){
     els.forEach(e => {
       if(knIds.has(e.id) || !/^\d{1,3}$/.test(e.tags.rcn_ref)) return; knIds.add(e.id);
       const ref = e.tags.rcn_ref;
-      if(knPts.some(k => k[0] === ref && dist([k[1],k[2]], [e.lat,e.lon]) < 150)) return;   // dubbele punten van hetzelfde knooppunt
+      if(knPts.some(k => k[0] === ref && dist([k[1],k[2]], [e.lat,e.lon]) < 700)) return;   // dubbele punten van hetzelfde knooppunt
       knPts.push([ref, e.lat, e.lon]);
       L.marker([e.lat, e.lon], {icon: L.divIcon({className:'kn', html:`<span>${ref}</span>`, iconSize:[32,32], iconAnchor:[16,16]}), zIndexOffset:500})
         .on('click', () => knPopup(ref, e.lat, e.lon)).addTo(knLayer);
