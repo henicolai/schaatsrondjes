@@ -64,6 +64,8 @@
   #unlock{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:40px;padding:18px 28px;font-size:16px}
   #unlock b{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(126,224,138,.25)}
   .leaflet-container{font:inherit}
+  .ants{animation:ants 1s linear infinite}
+  @keyframes ants{to{stroke-dashoffset:-20}}
 </style>
 </head>
 <body>
@@ -145,8 +147,10 @@ const cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{
   attribution:'© OpenStreetMap · fietskaart CyclOSM'});
 const overlay = L.tileLayer('https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png', {maxZoom:18, opacity:.6,
   attribution:'LF-routes © waymarkedtrails.org'});
-const trackLine = L.polyline([], {color:'#e0457b', weight:5}).addTo(map);
-const routeLine = L.polyline([], {color:'#2f7cf6', weight:5, opacity:.75, dashArray:'8 8'}).addTo(map);
+const routeCasing = L.polyline([], {color:'#ffffff', weight:12, opacity:.95, interactive:false}).addTo(map);
+const routeLine = L.polyline([], {color:'#e3001b', weight:7, opacity:1, interactive:false}).addTo(map);
+const routeAnts = L.polyline([], {color:'#ffffff', weight:3, opacity:1, dashArray:'4 16', className:'ants', interactive:false}).addTo(map);
+const trackLine = L.polyline([], {color:'#7b2fd6', weight:5, opacity:.9}).addTo(map);
 const me = L.circleMarker([0,0], {radius:8, color:'#fff', weight:3, fillColor:'#2f7cf6', fillOpacity:1});
 let destMarker = null, follow = true; const viaLayer = L.layerGroup().addTo(map);
 map.on('dragstart', () => setFollow(false));
@@ -243,7 +247,7 @@ function showDest(fit){
   if(destMarker){ map.removeLayer(destMarker); destMarker = null; }
   viaLayer.clearLayers();
   (d && d.via || []).forEach(v => L.circleMarker(v, {radius:7, color:'#fff', weight:2, fillColor:'#2f7cf6', fillOpacity:1}).addTo(viaLayer));
-  routeLine.setLatLngs(d && d.route ? d.route : []);
+  [routeCasing, routeLine, routeAnts].forEach(l => l.setLatLngs(d && d.route ? d.route : []));
   if(!d) return;
   $('destName').textContent = '→ ' + d.name;
   destMarker = L.marker([d.lat, d.lon]).addTo(map);
