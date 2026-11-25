@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1a14">
+<title>Fietsteller</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{--bg:#0f1a14;--card:#16261d;--line:#26402f;--txt:#eef7f0;--dim:#93ad9c;--acc:#7ee08a;--go:#3ddc97;--stop:#ff6b6b;--warn:#ffd166}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       padding:calc(env(safe-area-inset-top) + 10px) 12px calc(env(safe-area-inset-bottom) + 14px);user-select:none}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  h1{font-size:18px;margin:0;font-weight:650}
+  h1 a{color:var(--dim);text-decoration:none;font-size:14px;font-weight:500;margin-left:8px}
+  #gps{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  #gps i{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 12px}
+  .lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+  .val{font-variant-numeric:tabular-nums;font-weight:700;line-height:1.05;margin-top:3px;font-size:30px}
+  .val small{font-size:14px;color:var(--dim);font-weight:500}
+  #speedCard{display:flex;align-items:baseline;justify-content:space-between}
+  #speed{font-size:84px;color:var(--acc);font-variant-numeric:tabular-nums;font-weight:800;line-height:1}
+  #speed small{font-size:22px;color:var(--dim);font-weight:500}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  #destBar{display:none;margin-top:8px;align-items:center;gap:10px}
+  #destBar.on{display:flex}
+  #destBar div{flex:1;min-width:0}
+  #destName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;color:var(--dim)}
+  #destInfo{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  button{font:inherit;border:0;border-radius:14px;padding:15px 10px;font-size:18px;font-weight:650;color:var(--txt);background:var(--line)}
+  button:active{transform:scale(.98)}
+  .btns{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-top:8px}
+  #mainBtn{background:var(--go);color:#062b1b}
+  #mainBtn.pause{background:var(--warn);color:#3a2a00}
+  #stopBtn{background:var(--stop);color:#330808}
+  #stopBtn:disabled,#gpxBtn:disabled{opacity:.35}
+  .small{font-size:14px;padding:10px 8px;border-radius:11px}
+  .tools{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .tools button.on{background:var(--acc);color:#0b2410}
+  #map{height:46vh;min-height:260px;border-radius:16px;margin-top:8px;border:1px solid var(--line);background:#1c2a22}
+  #map.hide{display:none}
+  .search{display:flex;gap:8px;margin-top:8px}
+  .search input{flex:1;min-width:0;font:inherit;font-size:16px;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:11px;padding:10px}
+  #results{list-style:none;margin:6px 0 0;padding:0}
+  #results li{padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px}
+  #msg{min-height:18px;font-size:13px;color:var(--dim);margin-top:8px;text-align:center}
+  #lock{position:fixed;inset:0;background:rgba(5,12,8,.5);display:none;align-items:flex-end;justify-content:center;
+        padding-bottom:calc(env(safe-area-inset-bottom) + 40px);z-index:2000;touch-action:none}
+  #lock.on{display:flex}
+  #unlock{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:40px;padding:18px 28px;font-size:16px}
+  #unlock b{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(126,224,138,.25)}
+  .leaflet-container{font:inherit}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚲 Fietsteller <a href="../">⛸️ schaatsen</a></h1>
+  <div id="gps"><i></i><span>gps uit</span></div>
+</header>
+
+<div class="card" id="speedCard">
+  <div><div class="lbl">Snelheid</div><div id="speed">0,0<small> km/u</small></div></div>
+</div>
+<div class="grid">
+  <div class="card"><div class="lbl">Gemiddeld</div><div class="val" id="avg">–<small> km/u</small></div></div>
+  <div class="card"><div class="lbl">Maximum</div><div class="val" id="max">–<small> km/u</small></div></div>
+  <div class="card"><div class="lbl">Tijd</div><div class="val" id="time">0:00:00</div></div>
+  <div class="card"><div class="lbl">Afstand</div><div class="val" id="dist">0,00<small> km</small></div></div>
+</div>
+<div class="card" id="destBar">
+  <div><div id="destName"></div><div id="destInfo">–</div></div>
+  <button class="small" id="destClear">✕</button>
+</div>
+
+<div class="btns">
+  <button id="mainBtn">Start</button>
+  <button id="stopBtn" disabled>Stop</button>
+  <button id="lockBtn">🔒</button>
+</div>
+
+<div class="tools">
+  <button class="small" id="ovBtn">🗺️ Fietsroutes</button>
+  <button class="small on" id="followBtn">◎ Volgen</button>
+  <button class="small" id="mapBtn">Kaart verbergen</button>
+  <button class="small" id="gpxBtn" disabled>⬇ GPX</button>
+  <button class="small" id="newBtn">Nieuwe rit</button>
+</div>
+
+<div id="map"></div>
+
+<form class="search" id="searchForm">
+  <input id="q" type="search" placeholder="Bestemming (plaats, adres…)" autocomplete="off">
+  <button class="small" type="submit">Zoek</button>
+</form>
+<ul id="results"></ul>
+<div id="msg"></div>
+
+<div id="lock"><button id="unlock"><b></b>Houd ingedrukt om te ontgrendelen</button></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'fietsteller-v1', TAG = 'fietsteller';
+const MAXACC = 30, MOVING = 0.8;            // m/s ≈ 3 km/u: daaronder sta je stil
+
+let S = Object.assign({status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0,
+  track:[], dest:null, overlay:true, mapHidden:false}, load() || {});
+let geoId = null, wake = null, last = null, lastT = null, curV = 0, lastMoveAt = 0, pos = null, lastSave = 0, lastNotify = 0;
+
+function save(force){ if(!force && Date.now() - lastSave < 5000) return; lastSave = Date.now();
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
+function msg(t){ $('msg').textContent = t || ''; }
+const nl = (x, d=1) => x.toFixed(d).replace('.', ',');
+function hms(ms){ const s = Math.floor(ms/1000); return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function elapsed(){ return S.elapsed + (S.status === 'run' && S.runSince ? Date.now() - S.runSince : 0); }
+function avgKmh(){ return S.moving > 5000 ? S.dist / (S.moving/1000) * 3.6 : null; }
+function dist(a, b){ const R=6371000, r=Math.PI/180, dLat=(b[0]-a[0])*r, dLon=(b[1]-a[1])*r;
+  const h = Math.sin(dLat/2)**2 + Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+
+/* ---------- Kaart ---------- */
+const map = L.map('map', {zoomControl:false, attributionControl:true}).setView([52.38, 4.64], 13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19,
+  attribution:'© OpenStreetMap'}).addTo(map);
+const overlay = L.tileLayer('https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png', {maxZoom:18, opacity:.85,
+  attribution:'fietsroutes © waymarkedtrails.org'});
+const trackLine = L.polyline([], {color:'#e0457b', weight:5}).addTo(map);
+const routeLine = L.polyline([], {color:'#2f7cf6', weight:5, opacity:.75, dashArray:'8 8'}).addTo(map);
+const me = L.circleMarker([0,0], {radius:8, color:'#fff', weight:3, fillColor:'#2f7cf6', fillOpacity:1});
+let destMarker = null, follow = true;
+map.on('dragstart', () => setFollow(false));
+function setFollow(f){ follow = f; $('followBtn').classList.toggle('on', f); if(f && pos) map.setView(pos, Math.max(map.getZoom(), 15)); }
+function setOverlay(on){ S.overlay = on; on ? overlay.addTo(map) : map.removeLayer(overlay); $('ovBtn').classList.toggle('on', on);
+  $('ovBtn').textContent = on ? '🗺️ Fietsroutes aan' : '🗺️ Fietsroutes uit'; save(true); }
+function setMapHidden(h){ S.mapHidden = h; $('map').classList.toggle('hide', h); $('mapBtn').textContent = h ? 'Kaart tonen' : 'Kaart verbergen';
+  if(!h) setTimeout(() => map.invalidateSize(), 50); save(true); }
+function drawTrack(){ trackLine.setLatLngs(S.track.map(seg => seg.map(p => [p[0], p[1]]))); }
+
+/* ---------- Bestemming ---------- */
+$('searchForm').onsubmit = async e => {
+  e.preventDefault(); const q = $('q').value.trim(); if(!q) return;
+  msg('Zoeken…'); $('results').innerHTML = '';
+  try{
+    const near = pos ? `&viewbox=${pos[1]-.5},${pos[0]+.5},${pos[1]+.5},${pos[0]-.5}` : '';
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=nl,be,de&accept-language=nl${near}&q=${encodeURIComponent(q)}`);
+    const list = await r.json();
+    if(!list.length){ msg('Niets gevonden.'); return; }
+    msg('');
+    $('results').innerHTML = list.map((x,i) => `<li data-i="${i}">${x.display_name}</li>`).join('');
+    $('results').querySelectorAll('li').forEach(li => li.onclick = () => {
+      const x = list[+li.dataset.i]; $('results').innerHTML = ''; $('q').value = '';
+      setDest(x.display_name.split(',').slice(0,2).join(','), +x.lat, +x.lon);
+    });
+  }catch(err){ msg('Zoeken mislukt — geen internet?'); }
+};
+async function setDest(name, lat, lon){
+  S.dest = {name, lat, lon, route:null, cum:null}; save(true); showDest();
+  if(!pos){ msg('Bestemming gezet — route volgt zodra er gps is.'); return; }
+  await planRoute();
+}
+async function planRoute(){
+  if(!S.dest || !pos) return;
+  msg('Fietsroute berekenen…');
+  try{
+    const u = `https://brouter.de/brouter?lonlats=${pos[1]},${pos[0]}|${S.dest.lon},${S.dest.lat}&profile=trekking&alternativeidx=0&format=geojson`;
+    const g = await (await fetch(u)).json();
+    const route = g.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    const cum = [0]; for(let i=1;i<route.length;i++) cum.push(cum[i-1] + dist(route[i-1], route[i]));
+    Object.assign(S.dest, {route, cum}); save(true); msg('');
+  }catch(e){ S.dest.route = null; msg('Geen route gevonden — ik toon de afstand hemelsbreed.'); }
+  showDest(true);
+}
+function remaining(){
+  if(!S.dest || !pos) return null;
+  const d = S.dest;
+  if(!d.route) return dist(pos, [d.lat, d.lon]);
+  let bi = 0, bd = Infinity;
+  for(let i=0;i<d.route.length;i++){ const x = dist(pos, d.route[i]); if(x < bd){ bd = x; bi = i; } }
+  if(bd > 300 && Date.now() - (d.replanAt||0) > 60000){ d.replanAt = Date.now(); planRoute(); }  // van de route af: opnieuw plannen
+  return d.cum.at(-1) - d.cum[bi] + bd;
+}
+function showDest(fit){
+  const d = S.dest; $('destBar').classList.toggle('on', !!d);
+  if(destMarker){ map.removeLayer(destMarker); destMarker = null; }
+  routeLine.setLatLngs(d && d.route ? d.route : []);
+  if(!d) return;
+  $('destName').textContent = '→ ' + d.name;
+  destMarker = L.marker([d.lat, d.lon]).addTo(map);
+  if(fit){ setFollow(false); map.fitBounds(d.route ? routeLine.getBounds() : L.latLngBounds([pos || [d.lat,d.lon], [d.lat,d.lon]]), {padding:[30,30]}); }
+  renderDest();
+}
+function destText(){
+  const rem = remaining(); if(rem == null) return null;
+  const v = (avgKmh() || 16) / 3.6;                       // zonder gemiddelde: reken met 16 km/u
+  const eta = new Date(Date.now() + rem / v * 1000);
+  return {km: nl(rem/1000, rem < 10000 ? 2 : 1), eta: eta.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'})};
+}
+function renderDest(){ const t = destText(); $('destInfo').textContent = t ? `nog ${t.km} km · ~${t.eta}` : 'wacht op gps…'; }
+$('destClear').onclick = () => { S.dest = null; save(true); showDest(); notify(); };
+
+/* ---------- GPS ---------- */
+function gpsStatus(text, color){ $('gps').querySelector('span').textContent = text; $('gps').querySelector('i').style.background = color; }
+function onFix(p){
+  const c = p.coords, t = Date.now(), here = [c.latitude, c.longitude];
+  pos = here; me.setLatLng(here); if(!map.hasLayer(me)) me.addTo(map);
+  if(follow) map.setView(here, Math.max(map.getZoom(), 15), {animate:false});
+  gpsStatus(`± ${Math.round(c.accuracy)} m`, c.accuracy <= 10 ? 'var(--go)' : c.accuracy <= MAXACC ? 'var(--warn)' : 'var(--stop)');
+  if(S.dest && !S.dest.route && !S.dest.triedRoute){ S.dest.triedRoute = true; planRoute(); }
+  if(c.accuracy > MAXACC){ render(); return; }
+
+  let v = (c.speed != null && c.speed >= 0) ? c.speed : null;
+  if(S.status === 'run'){
+    if(last){
+      const d = dist(last, here), dt = (t - last[2]) / 1000;
+      if(d >= Math.max(3, c.accuracy * 0.5)){
+        if(v == null && dt > 0) v = d / dt;
+        if(d / Math.max(dt, .5) < 25){                     // sprongen > 90 km/u negeren
+          S.dist += d; last = [here[0], here[1], t];
+          S.track.at(-1).push([+here[0].toFixed(6), +here[1].toFixed(6), t]);
+          drawTrack();
+        }
+      }
+    } else {
+      last = [here[0], here[1], t];
+      if(!S.track.length || S.track.at(-1).length) S.track.push([]);
+      S.track.at(-1).push([+here[0].toFixed(6), +here[1].toFixed(6), t]);
+    }
+    if(v != null){ curV = v; if(v > MOVING) lastMoveAt = t; }
+    if(lastT && curV > MOVING) S.moving += Math.min(t - lastT, 10000);
+    if(v != null && c.accuracy <= 20 && v < 25) S.maxV = Math.max(S.maxV, v * 3.6);
+    lastT = t; save();
+  } else if(v != null) curV = v;
+  render();
+  if(S.status === 'run' && t - lastNotify > 10000) notify();
+}
+function startGps(){
+  if(geoId != null || !('geolocation' in navigator)) return;
+  gpsStatus('zoeken…', 'var(--warn)');
+  geoId = navigator.geolocation.watchPosition(onFix, e => {
+    gpsStatus('geen gps', 'var(--stop)');
+    msg(e.code === 1 ? 'Locatietoegang geweigerd — sta locatie toe in de instellingen.' : 'Geen gps-signaal.');
+  }, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+}
+
+/* ---------- Weergave ---------- */
+function render(){
+  if(Date.now() - lastMoveAt > 5000 && S.status === 'run') curV = 0;
+  $('speed').innerHTML = nl(S.status === 'run' ? curV * 3.6 : 0) + '<small> km/u</small>';
+  const a = avgKmh();
+  $('avg').innerHTML = (a == null ? '–' : nl(a)) + '<small> km/u</small>';
+  $('max').innerHTML = (S.maxV ? nl(S.maxV) : '–') + '<small> km/u</small>';
+  $('time').textContent = hms(elapsed());
+  $('dist').innerHTML = nl(S.dist/1000, 2) + '<small> km</small>';
+  const mb = $('mainBtn');
+  mb.textContent = S.status === 'run' ? 'Pauze' : S.status === 'idle' ? 'Start' : 'Doorgaan';
+  mb.classList.toggle('pause', S.status === 'run');
+  $('stopBtn').disabled = !(S.status === 'run' || S.status === 'pause');
+  $('gpxBtn').disabled = !S.track.some(s => s.length > 1);
+  if(S.dest) renderDest();
+}
+setInterval(() => { $('time').textContent = hms(elapsed()); if(S.status === 'run' && Date.now() - lastMoveAt > 5000){ curV = 0; $('speed').innerHTML = '0,0<small> km/u</small>'; } }, 1000);
+
+/* ---------- Melding → Galaxy Watch ---------- */
+async function notify(buzz){
+  lastNotify = Date.now();
+  if(!('Notification' in window) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
+  const reg = await navigator.serviceWorker.ready;
+  if(S.status === 'idle'){ (await reg.getNotifications({tag:TAG})).forEach(n => n.close()); return; }
+  const a = avgKmh(), dt = destText();
+  const head = S.status === 'run' ? `${nl(curV*3.6)} km/u · ${nl(S.dist/1000,2)} km`
+             : S.status === 'pause' ? `Pauze · ${nl(S.dist/1000,2)} km` : `Klaar · ${nl(S.dist/1000,2)} km`;
+  let body = `${hms(elapsed())} · gem ${a == null ? '–' : nl(a)} · max ${S.maxV ? nl(S.maxV) : '–'}`;
+  if(dt) body += ` · nog ${dt.km} km (${dt.eta})`;
+  const actions = S.status === 'run' ? [{action:'pause', title:'Pauze'}, {action:'stop', title:'Stop'}]
+                : S.status === 'pause' ? [{action:'resume', title:'Doorgaan'}, {action:'stop', title:'Stop'}]
+                : [{action:'resume', title:'Doorgaan'}];
+  reg.showNotification(head, {body, tag:TAG, renotify:!!buzz, silent:!buzz, requireInteraction:true,
+    icon:'icon-192.png', badge:'icon-192.png', actions});
+}
+
+/* ---------- Bediening ---------- */
+async function keepAwake(){ try{ if('wakeLock' in navigator && S.status === 'run') wake = await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') keepAwake(); });
+
+function cmd(c){
+  if(c === 'start' || c === 'resume'){
+    if(S.status === 'run') return;
+    S.status = 'run'; S.runSince = Date.now(); last = null; lastT = null; lastMoveAt = 0;
+    keepAwake(); startGps();
+  } else if(c === 'pause' || c === 'stop'){
+    if(S.status !== 'run' && !(c === 'stop' && S.status === 'pause')) return;
+    if(S.status === 'run'){ S.elapsed += Date.now() - S.runSince; S.runSince = null; }
+    S.status = c === 'stop' ? 'done' : 'pause'; last = null; curV = 0;
+    if(c === 'stop'){ try{ wake && wake.release(); }catch(e){} wake = null; }
+  }
+  save(true); render(); notify(true);
+  if(navigator.vibrate) navigator.vibrate(120);
+}
+$('mainBtn').onclick = async () => {
+  if('Notification' in window && Notification.permission === 'default'){ try{ await Notification.requestPermission(); }catch(e){} }
+  cmd(S.status === 'run' ? 'pause' : S.status === 'idle' ? 'start' : 'resume');
+};
+$('stopBtn').onclick = () => cmd('stop');
+let newArmed = 0;
+$('newBtn').onclick = () => {
+  if(S.status !== 'idle' && Date.now() - newArmed > 3000){ newArmed = Date.now(); msg('Tik nogmaals op Nieuwe rit om de huidige rit te wissen.'); return; }
+  Object.assign(S, {status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0, track:[]});
+  last = null; curV = 0; drawTrack(); save(true); render(); notify(); msg('Klaar voor een nieuwe rit.');
+};
+$('ovBtn').onclick = () => setOverlay(!S.overlay);
+$('followBtn').onclick = () => setFollow(!follow);
+$('mapBtn').onclick = () => setMapHidden(!S.mapHidden);
+$('gpxBtn').onclick = () => {
+  const segs = S.track.filter(s => s.length > 1).map(s => '<trkseg>' + s.map(p =>
+    `<trkpt lat="${p[0]}" lon="${p[1]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join('') + '</trkseg>').join('');
+  const start = S.track.find(s => s.length)?.[0]?.[2] || Date.now();
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Fietsteller" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Fietsrit ${new Date(start).toLocaleString('nl-NL')}</name>${segs}</trk></gpx>`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([gpx], {type:'application/gpx+xml'}));
+  a.download = `fietsrit-${new Date(start).toISOString().slice(0,10)}.gpx`; a.click();
+};
+
+/* Vergrendelen tegen per ongeluk tikken */
+$('lockBtn').onclick = () => $('lock').classList.add('on');
+(() => {
+  const u = $('unlock'), bar = u.querySelector('b'); let t0 = 0, raf = 0;
+  const step = () => { const p = Math.min(1, (Date.now() - t0) / 1200); bar.style.width = p*100 + '%';
+    if(p >= 1){ $('lock').classList.remove('on'); bar.style.width = 0; return; } raf = requestAnimationFrame(step); };
+  u.addEventListener('pointerdown', e => { e.preventDefault(); t0 = Date.now(); raf = requestAnimationFrame(step); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => u.addEventListener(ev, () => { cancelAnimationFrame(raf); bar.style.width = 0; }));
+})();
+
+/* Service worker: offline + knoppen in de melding (horloge) */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js', {scope:'./'});
+  navigator.serviceWorker.addEventListener('message', e => { if(e.data && e.data.type === 'cmd') cmd(e.data.cmd); });
+}
+
+/* Start */
+setOverlay(S.overlay); setMapHidden(S.mapHidden); drawTrack(); showDest();
+startGps();                                    // gps meteen aan, zodat de kaart je positie toont
+if(S.status === 'run') keepAwake();
+render();
+</script>
+</body>
+</html>
