@@ -198,7 +198,7 @@ async function overpass(qs){
   } finally { ctl.abort(); clearTimeout(tm); }
 }
 /* Knooppuntbordjes op de kaart (vanaf zoom 13, als de fietskaart aan staat) */
-const knLayer = L.layerGroup(), knIds = new Set(), knLoaded = []; let knTimer = null, knBusy = false;
+const knLayer = L.layerGroup(), knIds = new Set(), knLoaded = [], knPts = []; let knTimer = null, knBusy = false;
 function knVisible(){ return S.overlay && map.getZoom() >= 13; }
 function knRefresh(){
   if(!knVisible()){ map.removeLayer(knLayer); return; }
@@ -216,6 +216,8 @@ async function knLoad(){
     els.forEach(e => {
       if(knIds.has(e.id) || !/^\d{1,3}$/.test(e.tags.rcn_ref)) return; knIds.add(e.id);
       const ref = e.tags.rcn_ref;
+      if(knPts.some(k => k[0] === ref && dist([k[1],k[2]], [e.lat,e.lon]) < 150)) return;   // dubbele punten van hetzelfde knooppunt
+      knPts.push([ref, e.lat, e.lon]);
       L.marker([e.lat, e.lon], {icon: L.divIcon({className:'kn', html:`<span>${ref}</span>`, iconSize:[32,32], iconAnchor:[16,16]}), zIndexOffset:500})
         .on('click', () => knPopup(ref, e.lat, e.lon)).addTo(knLayer);
     });
