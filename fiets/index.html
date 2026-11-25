@@ -41,8 +41,18 @@
   .small{font-size:14px;padding:10px 8px;border-radius:11px}
   .tools{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
   .tools button.on{background:var(--acc);color:#0b2410}
-  #map{height:46vh;min-height:260px;border-radius:16px;margin-top:8px;border:1px solid var(--line);background:#1c2a22}
+  #map{height:62vh;min-height:300px;border-radius:16px;margin-top:8px;border:1px solid var(--line);background:#1c2a22}
   #map.hide{display:none}
+  #mapWrap{position:relative}
+  #mini{display:none}
+  body.big #mapWrap{position:fixed;inset:0;z-index:1500;background:var(--bg)}
+  body.big #map{height:100%;border-radius:0;margin:0;border:0}
+  body.big #mini{display:flex;position:absolute;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);z-index:1600;gap:6px;align-items:center;
+     background:rgba(15,26,20,.88);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 12px}
+  #miniTxt{flex:1;font-weight:700;font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+  #mini button{padding:9px 11px}
+  #mini button.on{background:var(--acc);color:#0b2410}
+  body.big #lock{z-index:2000}
   .search{display:flex;gap:8px;margin-top:8px}
   .search input{flex:1;min-width:0;font:inherit;font-size:16px;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:11px;padding:10px}
   #results{list-style:none;margin:6px 0 0;padding:0}
@@ -85,12 +95,17 @@
 <div class="tools">
   <button class="small" id="ovBtn">🗺️ Fietsroutes</button>
   <button class="small on" id="followBtn">◎ Volgen</button>
+  <button class="small" id="bigBtn">⤢ Grote kaart</button>
   <button class="small" id="mapBtn">Kaart verbergen</button>
   <button class="small" id="gpxBtn" disabled>⬇ GPX</button>
   <button class="small" id="newBtn">Nieuwe rit</button>
 </div>
 
-<div id="map"></div>
+<div id="mapWrap"><div id="map"></div>
+  <div id="mini"><span id="miniTxt">0,0 km/u</span>
+    <button class="small" id="ovBtn2">🗺️</button><button class="small" id="follow2">◎</button>
+    <button class="small" id="miniMain">▶</button><button class="small" id="bigClose">✕</button></div>
+</div>
 
 <form class="search" id="searchForm">
   <input id="q" type="search" placeholder="Bestemming (plaats, adres…)" autocomplete="off">
@@ -124,18 +139,24 @@ function dist(a, b){ const R=6371000, r=Math.PI/180, dLat=(b[0]-a[0])*r, dLon=(b
 
 /* ---------- Kaart ---------- */
 const map = L.map('map', {zoomControl:false, attributionControl:true}).setView([52.38, 4.64], 13);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19,
+const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19,
   attribution:'© OpenStreetMap'}).addTo(map);
-const overlay = L.tileLayer('https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png', {maxZoom:18, opacity:.85,
-  attribution:'fietsroutes © waymarkedtrails.org'});
+const cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {maxZoom:20, subdomains:'abc',
+  attribution:'© OpenStreetMap · fietskaart CyclOSM'});
+const overlay = L.tileLayer('https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png', {maxZoom:18, opacity:.6,
+  attribution:'LF-routes © waymarkedtrails.org'});
 const trackLine = L.polyline([], {color:'#e0457b', weight:5}).addTo(map);
 const routeLine = L.polyline([], {color:'#2f7cf6', weight:5, opacity:.75, dashArray:'8 8'}).addTo(map);
 const me = L.circleMarker([0,0], {radius:8, color:'#fff', weight:3, fillColor:'#2f7cf6', fillOpacity:1});
 let destMarker = null, follow = true;
 map.on('dragstart', () => setFollow(false));
-function setFollow(f){ follow = f; $('followBtn').classList.toggle('on', f); if(f && pos) map.setView(pos, Math.max(map.getZoom(), 15)); }
-function setOverlay(on){ S.overlay = on; on ? overlay.addTo(map) : map.removeLayer(overlay); $('ovBtn').classList.toggle('on', on);
-  $('ovBtn').textContent = on ? '🗺️ Fietsroutes aan' : '🗺️ Fietsroutes uit'; save(true); }
+function setFollow(f){ follow = f; $('followBtn').classList.toggle('on', f); $('follow2').classList.toggle('on', f); if(f && pos) map.setView(pos, Math.max(map.getZoom(), 15)); }
+function setOverlay(on){ S.overlay = on;
+  if(on){ map.removeLayer(osm); cyclosm.addTo(map); overlay.addTo(map); }
+  else { map.removeLayer(cyclosm); map.removeLayer(overlay); osm.addTo(map); }
+  [$('ovBtn'), $('ovBtn2')].forEach(b => { b.classList.toggle('on', on); });
+  $('ovBtn').textContent = on ? '🗺️ Fietskaart aan' : '🗺️ Fietskaart uit'; save(true); }
+function setBig(b){ document.body.classList.toggle('big', b); setTimeout(() => map.invalidateSize(), 60); if(b) setMapHidden(false); }
 function setMapHidden(h){ S.mapHidden = h; $('map').classList.toggle('hide', h); $('mapBtn').textContent = h ? 'Kaart tonen' : 'Kaart verbergen';
   if(!h) setTimeout(() => map.invalidateSize(), 50); save(true); }
 function drawTrack(){ trackLine.setLatLngs(S.track.map(seg => seg.map(p => [p[0], p[1]]))); }
@@ -207,7 +228,7 @@ function gpsStatus(text, color){ $('gps').querySelector('span').textContent = te
 function onFix(p){
   const c = p.coords, t = Date.now(), here = [c.latitude, c.longitude];
   pos = here; me.setLatLng(here); if(!map.hasLayer(me)) me.addTo(map);
-  if(follow) map.setView(here, Math.max(map.getZoom(), 15), {animate:false});
+  if(follow) map.setView(here, Math.max(map.getZoom(), 16), {animate:false});
   gpsStatus(`± ${Math.round(c.accuracy)} m`, c.accuracy <= 10 ? 'var(--go)' : c.accuracy <= MAXACC ? 'var(--warn)' : 'var(--stop)');
   if(S.dest && !S.dest.route && !S.dest.triedRoute){ S.dest.triedRoute = true; planRoute(); }
   if(c.accuracy > MAXACC){ render(); return; }
@@ -261,6 +282,12 @@ function render(){
   $('stopBtn').disabled = !(S.status === 'run' || S.status === 'pause');
   $('gpxBtn').disabled = !S.track.some(s => s.length > 1);
   if(S.dest) renderDest();
+  renderMini();
+}
+function renderMini(){
+  const t = destText();
+  $('miniTxt').textContent = `${nl(S.status === 'run' ? curV*3.6 : 0)} km/u · ${nl(S.dist/1000,2)} km` + (t ? ` · nog ${t.km}` : '');
+  $('miniMain').textContent = S.status === 'run' ? '⏸' : '▶';
 }
 setInterval(() => { $('time').textContent = hms(elapsed()); if(S.status === 'run' && Date.now() - lastMoveAt > 5000){ curV = 0; $('speed').innerHTML = '0,0<small> km/u</small>'; } }, 1000);
 
@@ -314,6 +341,11 @@ $('newBtn').onclick = () => {
 $('ovBtn').onclick = () => setOverlay(!S.overlay);
 $('followBtn').onclick = () => setFollow(!follow);
 $('mapBtn').onclick = () => setMapHidden(!S.mapHidden);
+$('bigBtn').onclick = () => setBig(true);
+$('bigClose').onclick = () => setBig(false);
+$('ovBtn2').onclick = () => setOverlay(!S.overlay);
+$('follow2').onclick = () => setFollow(!follow);
+$('miniMain').onclick = () => $('mainBtn').onclick();
 $('gpxBtn').onclick = () => {
   const segs = S.track.filter(s => s.length > 1).map(s => '<trkseg>' + s.map(p =>
     `<trkpt lat="${p[0]}" lon="${p[1]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join('') + '</trkseg>').join('');
