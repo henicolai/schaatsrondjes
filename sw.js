@@ -1,4 +1,4 @@
-const CACHE = 'schaatsrondjes-v3';
+const CACHE = 'schaatsrondjes-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -11,7 +11,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (e.request.mode === 'navigate') {   // pagina: eerst online (nieuwste versie), offline uit cache
-    e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })
+    e.respondWith(fetch(e.request.url, {cache:'no-cache'}).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })
       .catch(() => caches.match(e.request).then(r => r || caches.match('index.html'))));
     return;
   }
