@@ -54,10 +54,12 @@
   body.big #map{height:100%;border-radius:0;margin:0;border:0}
   body.big #mini{display:flex;position:absolute;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);z-index:1600;gap:6px;align-items:center;
      background:rgba(15,26,20,.88);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 12px}
-  #miniTxt{flex:1;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;line-height:1.1}
-  #miniV{font-size:40px;color:var(--acc);font-weight:800}
+  body.big #mini{flex-wrap:wrap;padding:8px 10px}
+  #mini button{flex:1}
+  #miniTxt{flex:1 1 100%;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;line-height:1.1}
+  #miniV{font-size:44px;color:var(--acc);font-weight:800}
   #miniTxt small{font-size:15px;color:var(--dim);font-weight:500}
-  #miniSub{font-size:19px;margin-top:2px}
+  #miniSub{font-size:20px;margin:2px 0 4px}
   #mini button{padding:14px 14px;font-size:20px;border-radius:12px}
   #mini button.on{background:var(--acc);color:#0b2410}
   body.big #lock{z-index:2000}
