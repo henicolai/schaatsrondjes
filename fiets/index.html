@@ -311,6 +311,15 @@ function destText(){
 function renderDest(){ const t = destText(); $('destInfo').textContent = t ? `nog ${t.km} km · ~${t.eta}` : 'wacht op gps…'; }
 $('destClear').onclick = () => { S.dest = null; save(true); showDest(); notify(); };
 
+/* ---------- Demping snelheid ---------- */
+let smoothT = 0;
+function smooth(v, t){
+  if(v <= MOVING){ smoothT = t; return 0; }                   // stilstaan: meteen 0
+  const dt = smoothT ? Math.min((t - smoothT) / 1000, 5) : 5;  // tijd sinds vorige meting
+  smoothT = t;
+  const k = 1 - Math.exp(-dt / 4);                             // tijdconstante 4 s
+  return curV > MOVING ? curV + k * (v - curV) : v;
+}
 /* ---------- GPS ---------- */
 function gpsStatus(text, color){ $('gps').querySelector('span').textContent = text; $('gps').querySelector('i').style.background = color; }
 function onFix(p){
@@ -339,11 +348,11 @@ function onFix(p){
       if(!S.track.length || S.track.at(-1).length) S.track.push([]);
       S.track.at(-1).push([+here[0].toFixed(6), +here[1].toFixed(6), t]);
     }
-    if(v != null){ curV = v; if(v > MOVING) lastMoveAt = t; }
+    if(v != null){ curV = smooth(v, t); if(v > MOVING) lastMoveAt = t; }
     if(lastT && curV > MOVING) S.moving += Math.min(t - lastT, 10000);
     if(v != null && c.accuracy <= 20 && v < 25) S.maxV = Math.max(S.maxV, v * 3.6);
     lastT = t; save();
-  } else if(v != null) curV = v;
+  } else if(v != null) curV = smooth(v, t);
   render();
   if(S.status === 'run' && t - lastNotify > 10000) notify();
 }
@@ -405,7 +414,7 @@ document.addEventListener('visibilitychange', () => { if(document.visibilityStat
 function cmd(c){
   if(c === 'start' || c === 'resume'){
     if(S.status === 'run') return;
-    S.status = 'run'; S.runSince = Date.now(); last = null; lastT = null; lastMoveAt = 0;
+    S.status = 'run'; S.runSince = Date.now(); last = null; lastT = null; lastMoveAt = 0; smoothT = 0;
     keepAwake(); startGps();
   } else if(c === 'pause' || c === 'stop'){
     if(S.status !== 'run' && !(c === 'stop' && S.status === 'pause')) return;
