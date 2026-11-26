@@ -90,6 +90,8 @@
   <div class="card"><div class="lbl">Maximum</div><div class="val" id="max">–<small> km/u</small></div></div>
   <div class="card"><div class="lbl">Tijd</div><div class="val" id="time">0:00:00</div></div>
   <div class="card"><div class="lbl">Afstand</div><div class="val" id="dist">0,00<small> km</small></div></div>
+  <div class="card"><div class="lbl">Hoogte</div><div class="val" id="alt">–<small> m</small></div></div>
+  <div class="card"><div class="lbl">Gestegen</div><div class="val" id="climb">0<small> m</small></div></div>
 </div>
 <div class="card" id="destBar">
   <div><div id="destName"></div><div id="destInfo">–</div></div>
@@ -132,7 +134,7 @@ const $ = id => document.getElementById(id);
 const KEY = 'fietsteller-v1', TAG = 'fietsteller';
 const MAXACC = 30, MOVING = 0.8;            // m/s ≈ 3 km/u: daaronder sta je stil
 
-let S = Object.assign({status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0,
+let S = Object.assign({status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0, climb:0,
   track:[], dest:null, overlay:true, mapHidden:false}, load() || {});
 let geoId = null, wake = null, last = null, lastT = null, curV = 0, lastMoveAt = 0, pos = null, lastSave = 0, lastNotify = 0;
 
@@ -318,7 +320,7 @@ function renderDest(){ const t = destText(); $('destInfo').textContent = t ? `no
 $('destClear').onclick = () => { S.dest = null; save(true); showDest(); notify(); };
 
 /* ---------- Demping snelheid ---------- */
-let smoothT = 0;
+let smoothT = 0, altSm = null, altRef = null;
 function smooth(v, t){
   if(v <= MOVING){ smoothT = t; return 0; }                   // stilstaan: meteen 0
   const dt = smoothT ? Math.min((t - smoothT) / 1000, 5) : 5;  // tijd sinds vorige meting
@@ -337,6 +339,14 @@ function onFix(p){
   if(S.dest && !S.dest.route && !S.dest.triedRoute){ S.dest.triedRoute = true; planRoute(); }
   if(c.accuracy > MAXACC){ render(); return; }
 
+  if(c.altitude != null && (c.altitudeAccuracy == null || c.altitudeAccuracy <= 25)){
+    altSm = altSm == null ? c.altitude : altSm + 0.15 * (c.altitude - altSm);   // gedempte hoogte
+    if(S.status === 'run'){
+      if(altRef == null) altRef = altSm;
+      if(altSm - altRef >= 3){ S.climb += altSm - altRef; altRef = altSm; }       // stijging pas tellen boven 3 m ruis
+      else if(altSm < altRef) altRef = altSm;
+    }
+  }
   let v = (c.speed != null && c.speed >= 0) ? c.speed : null;
   if(S.status === 'run'){
     if(last){
@@ -345,7 +355,7 @@ function onFix(p){
         if(v == null && dt > 0) v = d / dt;
         if(d / Math.max(dt, .5) < 25){                     // sprongen > 90 km/u negeren
           S.dist += d; last = [here[0], here[1], t];
-          S.track.at(-1).push([+here[0].toFixed(6), +here[1].toFixed(6), t]);
+          S.track.at(-1).push([+here[0].toFixed(6), +here[1].toFixed(6), t, altSm == null ? null : Math.round(altSm)]);
           drawTrack();
         }
       }
@@ -380,6 +390,8 @@ function render(){
   $('max').innerHTML = (S.maxV ? nl(S.maxV) : '–') + '<small> km/u</small>';
   $('time').textContent = hms(elapsed());
   $('dist').innerHTML = nl(S.dist/1000, 2) + '<small> km</small>';
+  $('alt').innerHTML = (altSm == null ? '–' : Math.round(altSm)) + '<small> m</small>';
+  $('climb').innerHTML = Math.round(S.climb) + '<small> m</small>';
   const mb = $('mainBtn');
   mb.textContent = S.status === 'run' ? 'Pauze' : S.status === 'idle' ? 'Start' : 'Doorgaan';
   mb.classList.toggle('pause', S.status === 'run');
@@ -404,7 +416,7 @@ async function notify(buzz){
   const a = avgKmh(), dt = destText();
   const head = S.status === 'run' ? `${nl(curV*3.6)} km/u · ${nl(S.dist/1000,2)} km`
              : S.status === 'pause' ? `Pauze · ${nl(S.dist/1000,2)} km` : `Klaar · ${nl(S.dist/1000,2)} km`;
-  let body = `${hms(elapsed())} · gem ${a == null ? '–' : nl(a)} · max ${S.maxV ? nl(S.maxV) : '–'}`;
+  let body = `${hms(elapsed())} · gem ${a == null ? '–' : nl(a)} · max ${S.maxV ? nl(S.maxV) : '–'} · ↑${Math.round(S.climb)} m`;
   if(dt) body += ` · nog ${dt.km} km (${dt.eta})`;
   const actions = S.status === 'run' ? [{action:'pause', title:'Pauze'}, {action:'stop', title:'Stop'}]
                 : S.status === 'pause' ? [{action:'resume', title:'Doorgaan'}, {action:'stop', title:'Stop'}]
@@ -439,8 +451,8 @@ $('stopBtn').onclick = () => cmd('stop');
 let newArmed = 0;
 $('newBtn').onclick = () => {
   if(S.status !== 'idle' && Date.now() - newArmed > 3000){ newArmed = Date.now(); msg('Tik nogmaals op Nieuwe rit om de huidige rit te wissen.'); return; }
-  Object.assign(S, {status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0, track:[]});
-  last = null; curV = 0; drawTrack(); save(true); render(); notify(); msg('Klaar voor een nieuwe rit.');
+  Object.assign(S, {status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0, climb:0, track:[]});
+  last = null; curV = 0; altRef = null; drawTrack(); save(true); render(); notify(); msg('Klaar voor een nieuwe rit.');
 };
 $('ovBtn').onclick = () => setOverlay(!S.overlay);
 $('followBtn').onclick = () => setFollow(!follow);
@@ -452,7 +464,7 @@ $('follow2').onclick = () => setFollow(!follow);
 $('miniMain').onclick = () => $('mainBtn').onclick();
 $('gpxBtn').onclick = () => {
   const segs = S.track.filter(s => s.length > 1).map(s => '<trkseg>' + s.map(p =>
-    `<trkpt lat="${p[0]}" lon="${p[1]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join('') + '</trkseg>').join('');
+    `<trkpt lat="${p[0]}" lon="${p[1]}">${p[3] != null ? `<ele>${p[3]}</ele>` : ''}<time>${new Date(p[2]).toISOString()}</time></trkpt>`).join('') + '</trkseg>').join('');
   const start = S.track.find(s => s.length)?.[0]?.[2] || Date.now();
   const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Fietsteller" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Fietsrit ${new Date(start).toLocaleString('nl-NL')}</name>${segs}</trk></gpx>`;
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([gpx], {type:'application/gpx+xml'}));
