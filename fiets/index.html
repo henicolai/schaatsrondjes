@@ -46,14 +46,19 @@
   .tools button.on{background:var(--acc);color:#0b2410}
   #map{height:62vh;min-height:300px;border-radius:16px;margin-top:8px;border:1px solid var(--line);background:#1c2a22}
   #map.hide{display:none}
+  body:not(.alt) .altc{display:none}
+  .tools button#altBtn.on{background:var(--acc);color:#0b2410}
   #mapWrap{position:relative}
   #mini{display:none}
   body.big #mapWrap{position:fixed;inset:0;z-index:1500;background:var(--bg)}
   body.big #map{height:100%;border-radius:0;margin:0;border:0}
   body.big #mini{display:flex;position:absolute;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);z-index:1600;gap:6px;align-items:center;
      background:rgba(15,26,20,.88);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 12px}
-  #miniTxt{flex:1;font-weight:700;font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
-  #mini button{padding:9px 11px}
+  #miniTxt{flex:1;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;line-height:1.1}
+  #miniV{font-size:40px;color:var(--acc);font-weight:800}
+  #miniTxt small{font-size:15px;color:var(--dim);font-weight:500}
+  #miniSub{font-size:19px;margin-top:2px}
+  #mini button{padding:14px 14px;font-size:20px;border-radius:12px}
   #mini button.on{background:var(--acc);color:#0b2410}
   body.big #lock{z-index:2000}
   .search{display:flex;gap:5px;margin-top:6px}
@@ -95,8 +100,8 @@
 <div class="grid">
   <div class="card"><div class="lbl">Tijd</div><div class="val" id="time">0:00:00</div></div>
   <div class="card"><div class="lbl">Afstand</div><div class="val" id="dist">0,00<small> km</small></div></div>
-  <div class="card"><div class="lbl">Hoogte</div><div class="val" id="alt">–<small> m</small></div></div>
-  <div class="card"><div class="lbl">Gestegen</div><div class="val" id="climb">0<small> m</small></div></div>
+  <div class="card altc"><div class="lbl">Hoogte</div><div class="val" id="alt">–<small> m</small></div></div>
+  <div class="card altc"><div class="lbl">Gestegen</div><div class="val" id="climb">0<small> m</small></div></div>
 </div>
 <div class="card" id="destBar">
   <div><div id="destName"></div><div id="destInfo">–</div></div>
@@ -114,6 +119,7 @@
   <button class="small on" id="followBtn">◎ Volgen</button>
   <button class="small" id="bigBtn">⤢ Grote kaart</button>
   <button class="small" id="mapBtn">Kaart verbergen</button>
+  <button class="small" id="altBtn">⛰️ Hoogte</button>
   <button class="small" id="gpxBtn" disabled>⬇ GPX</button>
   <button class="small" id="newBtn">Nieuwe rit</button>
 </div>
@@ -124,7 +130,7 @@
 </form>
 <ul id="results"></ul>
 <div id="mapWrap"><div id="map"></div>
-  <div id="mini"><span id="miniTxt">0,0 km/u</span>
+  <div id="mini"><div id="miniTxt"><b id="miniV">0,0</b><small> km/u</small><div id="miniSub">0,00 km</div></div>
     <button class="small" id="ovBtn2">🗺️</button><button class="small" id="follow2">◎</button>
     <button class="small" id="miniMain">▶</button><button class="small" id="bigClose">✕</button></div>
 </div>
@@ -140,7 +146,7 @@ const KEY = 'fietsteller-v1', TAG = 'fietsteller';
 const MAXACC = 30, MOVING = 0.8;            // m/s ≈ 3 km/u: daaronder sta je stil
 
 let S = Object.assign({status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0, climb:0,
-  track:[], dest:null, overlay:true, mapHidden:false}, load() || {});
+  track:[], dest:null, overlay:true, mapHidden:false, showAlt:false}, load() || {});
 let geoId = null, wake = null, last = null, lastT = null, curV = 0, lastMoveAt = 0, pos = null, lastSave = 0, lastNotify = 0;
 
 function save(force){ if(!force && Date.now() - lastSave < 5000) return; lastSave = Date.now();
@@ -168,14 +174,16 @@ const routeAnts = L.polyline([], {color:'#ffffff', weight:3, opacity:1, dashArra
 const trackLine = L.polyline([], {color:'#7b2fd6', weight:5, opacity:.9}).addTo(map);
 const me = L.marker([0,0], {icon: L.divIcon({className:'me', html:'<i></i><b></b>', iconSize:[40,40], iconAnchor:[20,20]}), zIndexOffset:1000, interactive:false});
 let destMarker = null, follow = true; const viaLayer = L.layerGroup().addTo(map);
-map.on('dragstart', () => setFollow(false));
+let followTimer = null;
+map.on('dragstart', () => { setFollow(false); resumeFollow(15000); });
+function resumeFollow(ms){ clearTimeout(followTimer); followTimer = setTimeout(() => { if(S.status === 'run' || document.body.classList.contains('big')) setFollow(true); }, ms); }
 function setFollow(f){ follow = f; $('followBtn').classList.toggle('on', f); $('follow2').classList.toggle('on', f); if(f && pos) map.setView(pos, Math.max(map.getZoom(), 15)); }
 function setOverlay(on){ S.overlay = on;
   if(on){ map.removeLayer(osm); cyclosm.addTo(map); overlay.addTo(map); }
   else { map.removeLayer(cyclosm); map.removeLayer(overlay); osm.addTo(map); }
   [$('ovBtn'), $('ovBtn2')].forEach(b => { b.classList.toggle('on', on); });
   $('ovBtn').textContent = on ? '🗺️ Fietskaart aan' : '🗺️ Fietskaart uit'; save(true); if(typeof knRefresh === 'function') knRefresh(); }
-function setBig(b){ document.body.classList.toggle('big', b); setTimeout(() => map.invalidateSize(), 60); if(b) setMapHidden(false); }
+function setBig(b){ document.body.classList.toggle('big', b); if(b){ setMapHidden(false); setFollow(true); } setTimeout(() => { map.invalidateSize(); if(follow && pos) map.setView(pos, Math.max(map.getZoom(), 16)); }, 80); }
 function setMapHidden(h){ S.mapHidden = h; $('map').classList.toggle('hide', h); $('mapBtn').textContent = h ? 'Kaart tonen' : 'Kaart verbergen';
   if(!h) setTimeout(() => map.invalidateSize(), 50); save(true); }
 function drawTrack(){ trackLine.setLatLngs(S.track.map(seg => seg.map(p => [p[0], p[1]]))); }
@@ -312,7 +320,7 @@ function showDest(fit){
   if(!d) return;
   $('destName').textContent = '→ ' + d.name;
   destMarker = L.marker([d.lat, d.lon]).addTo(map);
-  if(fit){ setFollow(false); map.fitBounds(d.route ? routeLine.getBounds() : L.latLngBounds([pos || [d.lat,d.lon], [d.lat,d.lon]]), {padding:[30,30]}); }
+  if(fit){ setFollow(false); resumeFollow(8000); map.fitBounds(d.route ? routeLine.getBounds() : L.latLngBounds([pos || [d.lat,d.lon], [d.lat,d.lon]]), {padding:[30,30]}); }
   renderDest();
 }
 function destText(){
@@ -407,10 +415,11 @@ function render(){
 }
 function renderMini(){
   const t = destText();
-  $('miniTxt').textContent = `${nl(S.status === 'run' ? curV*3.6 : 0)} km/u · ${nl(S.dist/1000,2)} km` + (t ? ` · nog ${t.km}` : '');
+  $('miniV').textContent = nl(S.status === 'run' ? curV*3.6 : 0);
+  $('miniSub').textContent = `${nl(S.dist/1000,2)} km · ${hms(elapsed())}` + (t ? ` · nog ${t.km}` : '');
   $('miniMain').textContent = S.status === 'run' ? '⏸' : '▶';
 }
-setInterval(() => { $('time').textContent = hms(elapsed()); if(S.status === 'run' && Date.now() - lastMoveAt > 5000){ curV = 0; $('speed').innerHTML = '0,0<small> km/u</small>'; } }, 1000);
+setInterval(() => { $('time').textContent = hms(elapsed()); renderMini(); if(S.status === 'run' && Date.now() - lastMoveAt > 5000){ curV = 0; $('speed').innerHTML = '0,0<small> km/u</small>'; } }, 1000);
 
 /* ---------- Melding → Galaxy Watch ---------- */
 async function notify(buzz){
@@ -437,7 +446,7 @@ document.addEventListener('visibilitychange', () => { if(document.visibilityStat
 function cmd(c){
   if(c === 'start' || c === 'resume'){
     if(S.status === 'run') return;
-    S.status = 'run'; S.runSince = Date.now(); last = null; lastT = null; lastMoveAt = 0; smoothT = 0;
+    S.status = 'run'; S.runSince = Date.now(); last = null; lastT = null; lastMoveAt = 0; smoothT = 0; setFollow(true);
     keepAwake(); startGps();
   } else if(c === 'pause' || c === 'stop'){
     if(S.status !== 'run' && !(c === 'stop' && S.status === 'pause')) return;
@@ -462,6 +471,8 @@ $('newBtn').onclick = () => {
 $('ovBtn').onclick = () => setOverlay(!S.overlay);
 $('followBtn').onclick = () => setFollow(!follow);
 $('mapBtn').onclick = () => setMapHidden(!S.mapHidden);
+function setAlt(on){ S.showAlt = on; document.body.classList.toggle('alt', on); $('altBtn').classList.toggle('on', on); save(true); }
+$('altBtn').onclick = () => setAlt(!S.showAlt);
 $('bigBtn').onclick = () => setBig(true);
 $('bigClose').onclick = () => setBig(false);
 $('ovBtn2').onclick = () => setOverlay(!S.overlay);
@@ -493,7 +504,7 @@ if('serviceWorker' in navigator){
 }
 
 /* Start */
-setOverlay(S.overlay); setMapHidden(S.mapHidden); knRefresh(); drawTrack(); showDest();
+setOverlay(S.overlay); setMapHidden(S.mapHidden); setAlt(S.showAlt); knRefresh(); drawTrack(); showDest();
 startGps();                                    // gps meteen aan, zodat de kaart je positie toont
 if(S.status === 'run') keepAwake();
 render();
