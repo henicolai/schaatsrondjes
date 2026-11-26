@@ -22,8 +22,10 @@
   .lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
   .val{font-variant-numeric:tabular-nums;font-weight:700;line-height:1.05;margin-top:3px;font-size:30px}
   .val small{font-size:14px;color:var(--dim);font-weight:500}
-  #speedCard{display:flex;justify-content:center;text-align:center}
-  #speed{font-size:84px;color:var(--acc);font-variant-numeric:tabular-nums;font-weight:800;line-height:1}
+  #speedCard{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  #speedCard .side{display:flex;flex-direction:column;gap:8px;text-align:right;padding-left:10px;border-left:1px solid var(--line)}
+  #speedCard .side .val{font-size:24px}
+  #speed{font-size:76px;white-space:nowrap;color:var(--acc);font-variant-numeric:tabular-nums;font-weight:800;line-height:1}
   #speed small{font-size:22px;color:var(--dim);font-weight:500}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
   #destBar{display:none;margin-top:8px;align-items:center;gap:10px}
@@ -84,10 +86,12 @@
 
 <div class="card" id="speedCard">
   <div><div class="lbl">Snelheid</div><div id="speed">0,0<small> km/u</small></div></div>
+  <div class="side">
+    <div><div class="lbl">Gemiddeld</div><div class="val" id="avg">–<small> km/u</small></div></div>
+    <div><div class="lbl">Maximum</div><div class="val" id="max">–<small> km/u</small></div></div>
+  </div>
 </div>
 <div class="grid">
-  <div class="card"><div class="lbl">Gemiddeld</div><div class="val" id="avg">–<small> km/u</small></div></div>
-  <div class="card"><div class="lbl">Maximum</div><div class="val" id="max">–<small> km/u</small></div></div>
   <div class="card"><div class="lbl">Tijd</div><div class="val" id="time">0:00:00</div></div>
   <div class="card"><div class="lbl">Afstand</div><div class="val" id="dist">0,00<small> km</small></div></div>
   <div class="card"><div class="lbl">Hoogte</div><div class="val" id="alt">–<small> m</small></div></div>
