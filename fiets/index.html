@@ -199,7 +199,7 @@ $('searchForm').onsubmit = async e => {
   msg('Zoeken…');
   try{
     const near = pos ? `&viewbox=${pos[1]-.5},${pos[0]+.5},${pos[1]+.5},${pos[0]-.5}` : '';
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=nl,be,de&accept-language=nl${near}&q=${encodeURIComponent(q)}`);
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=nl${near}&q=${encodeURIComponent(q)}`);
     const list = await r.json();
     if(!list.length){ msg('Niets gevonden.'); return; }
     msg('');
