@@ -292,26 +292,38 @@ async function setDest(name, lat, lon){
   if(!pos){ msg('Bestemming gezet — route volgt zodra er gps is.'); return; }
   await planRoute();
 }
-async function planRoute(){
-  if(!S.dest || !pos) return;
-  msg('Fietsroute berekenen…');
+let replanning = false, offCount = 0, lastOff = 0;
+async function planRoute(reroute){
+  if(!S.dest || !pos || replanning) return;
+  replanning = true;
+  msg(reroute ? 'Van de route af — nieuwe route berekenen…' : 'Fietsroute berekenen…');
   try{
     const u = `https://brouter.de/brouter?lonlats=${[pos, ...(S.dest.via||[]), [S.dest.lat, S.dest.lon]].map(p => p[1]+','+p[0]).join('|')}&profile=trekking&alternativeidx=0&format=geojson`;
     const g = await (await fetch(u)).json();
     const route = g.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
     const cum = [0]; for(let i=1;i<route.length;i++) cum.push(cum[i-1] + dist(route[i-1], route[i]));
-    Object.assign(S.dest, {route, cum}); save(true); msg('');
-  }catch(e){ S.dest.route = null; msg('Geen route gevonden — ik toon de afstand hemelsbreed.'); }
-  showDest(true);
+    Object.assign(S.dest, {route, cum}); save(true); msg(reroute ? 'Route herberekend.' : '');
+    if(reroute){ if(navigator.vibrate) navigator.vibrate([150, 100, 150]); notify(true); }
+  }catch(e){ if(!reroute){ S.dest.route = null; msg('Geen route gevonden — ik toon de afstand hemelsbreed.'); } else msg('Herberekenen mislukt — probeer het zo opnieuw.'); }
+  finally { replanning = false; offCount = 0; }
+  showDest(!reroute);
+}
+function segDist(p, a, b){                       // afstand punt–lijnstuk in meters (+ positie t op het stuk)
+  const kx = Math.cos(p[0]*Math.PI/180) * 111320, ky = 110540;
+  const ax = (a[1]-p[1])*kx, ay = (a[0]-p[0])*ky, dx = (b[1]-a[1])*kx, dy = (b[0]-a[0])*ky;
+  const L = dx*dx + dy*dy; let t = L ? -(ax*dx + ay*dy) / L : 0; t = Math.max(0, Math.min(1, t));
+  return [Math.hypot(ax + t*dx, ay + t*dy), t];
 }
 function remaining(){
   if(!S.dest || !pos) return null;
   const d = S.dest;
   if(!d.route) return dist(pos, [d.lat, d.lon]);
-  let bi = 0, bd = Infinity;
-  for(let i=0;i<d.route.length;i++){ const x = dist(pos, d.route[i]); if(x < bd){ bd = x; bi = i; } }
-  if(bd > 300 && Date.now() - (d.replanAt||0) > 60000){ d.replanAt = Date.now(); planRoute(); }  // van de route af: opnieuw plannen
-  return d.cum.at(-1) - d.cum[bi] + bd;
+  let bi = 0, bd = Infinity, bt = 0;
+  for(let i=0;i<d.route.length-1;i++){ const [x, t] = segDist(pos, d.route[i], d.route[i+1]); if(x < bd){ bd = x; bi = i; bt = t; } }
+  if(d.route.length < 2) bd = dist(pos, d.route[0] || [d.lat, d.lon]);
+  lastOff = bd;
+  const done = d.cum[bi] + bt * ((d.cum[bi+1] ?? d.cum[bi]) - d.cum[bi]);
+  return Math.max(0, d.cum.at(-1) - done) + bd;
 }
 function showDest(fit){
   const d = S.dest; $('destBar').classList.toggle('on', !!d);
@@ -384,6 +396,11 @@ function onFix(p){
     if(v != null && c.accuracy <= 20 && v < 25) S.maxV = Math.max(S.maxV, v * 3.6);
     lastT = t; save();
   } else if(v != null) curV = smooth(v, t);
+  if(S.dest && S.dest.route && c.accuracy <= 25){        // afwijking van de route: 3 metingen > 50 m → herberekenen
+    remaining();
+    offCount = lastOff > Math.max(50, c.accuracy * 2) ? offCount + 1 : 0;
+    if(offCount >= 3 && Date.now() - (S.dest.replanAt || 0) > 20000){ S.dest.replanAt = Date.now(); planRoute(true); }
+  }
   render();
   if(S.status === 'run' && t - lastNotify > 10000) notify();
 }
