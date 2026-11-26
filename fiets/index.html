@@ -64,6 +64,12 @@
   #unlock{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:40px;padding:18px 28px;font-size:16px}
   #unlock b{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(126,224,138,.25)}
   .leaflet-container{font:inherit}
+  .me{pointer-events:none}
+  .me b{position:absolute;left:11px;top:11px;width:18px;height:18px;border-radius:50%;background:#ff1f1f;border:3px solid #fff;
+        box-shadow:0 0 6px rgba(0,0,0,.5);box-sizing:border-box;animation:blink 1s steps(1) infinite}
+  .me i{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;background:rgba(255,31,31,.45);animation:pulse 1.5s ease-out infinite}
+  @keyframes blink{50%{background:#fff;border-color:#ff1f1f}}
+  @keyframes pulse{from{transform:scale(.3);opacity:.9}to{transform:scale(1.2);opacity:0}}
   .kn span{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#fff;
      border:3px solid #138a36;color:#111;font-weight:800;font-size:15px;box-shadow:0 1px 4px rgba(0,0,0,.45);box-sizing:border-box}
   .ants{animation:ants 1s linear infinite}
@@ -153,7 +159,7 @@ const routeCasing = L.polyline([], {color:'#ffffff', weight:12, opacity:.95, int
 const routeLine = L.polyline([], {color:'#e3001b', weight:7, opacity:1, interactive:false}).addTo(map);
 const routeAnts = L.polyline([], {color:'#ffffff', weight:3, opacity:1, dashArray:'4 16', className:'ants', interactive:false}).addTo(map);
 const trackLine = L.polyline([], {color:'#7b2fd6', weight:5, opacity:.9}).addTo(map);
-const me = L.circleMarker([0,0], {radius:8, color:'#fff', weight:3, fillColor:'#2f7cf6', fillOpacity:1});
+const me = L.marker([0,0], {icon: L.divIcon({className:'me', html:'<i></i><b></b>', iconSize:[40,40], iconAnchor:[20,20]}), zIndexOffset:1000, interactive:false});
 let destMarker = null, follow = true; const viaLayer = L.layerGroup().addTo(map);
 map.on('dragstart', () => setFollow(false));
 function setFollow(f){ follow = f; $('followBtn').classList.toggle('on', f); $('follow2').classList.toggle('on', f); if(f && pos) map.setView(pos, Math.max(map.getZoom(), 15)); }
