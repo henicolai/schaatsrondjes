@@ -87,6 +87,14 @@
   #results{list-style:none;margin:6px 0 0;padding:0}
   #results li{padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px}
   #msg{min-height:18px;font-size:13px;color:var(--dim);margin-top:8px;text-align:center}
+  #instHelp{position:fixed;inset:0;background:rgba(5,12,8,.75);display:none;align-items:center;justify-content:center;z-index:2500;padding:16px}
+  #instHelp.on{display:flex}
+  #instHelp .box{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;max-width:360px;font-size:16px;line-height:1.4}
+  #instHelp h2{margin:0 0 8px;font-size:19px}
+  #instHelp ol{padding-left:20px;margin:8px 0}
+  #instHelp li{margin-bottom:8px}
+  #instHelp small{color:var(--dim)}
+  #instHelp button{width:100%;margin-top:6px;background:var(--acc);color:#0b2410}
   #lock{position:fixed;inset:0;background:rgba(5,12,8,.5);display:none;align-items:flex-end;justify-content:center;
         padding-bottom:calc(env(safe-area-inset-bottom) + 40px);z-index:2000;touch-action:none}
   #lock.on{display:flex}
@@ -142,7 +150,7 @@
   <button class="small" id="headBtn">🧭 Rijrichting</button>
   <button class="small" id="bigBtn">⤢ Grote kaart</button>
   <button class="small" id="fsBtn">⛶ Volledig scherm</button>
-  <button class="small" id="instBtn" style="display:none;background:#2f7cf6;color:#fff">📲 Installeer als app</button>
+  <button class="small" id="instBtn" style="background:#2f7cf6;color:#fff">📲 Installeer als app</button>
   <button class="small" id="mapBtn">Kaart verbergen</button>
   <button class="small" id="altBtn">⛰️ Hoogte</button>
   <button class="small" id="gpxBtn" disabled>⬇ GPX</button>
@@ -163,6 +171,16 @@
 
 <div id="msg"></div>
 
+<div id="instHelp"><div class="box">
+  <h2>📲 Fietsteller installeren</h2>
+  <ol>
+    <li>Tik rechtsboven in Chrome op <b>⋮</b> (drie puntjes).</li>
+    <li>Kies <b>App installeren</b>.<br><small>Staat dat er niet? Kies <b>Toevoegen aan startscherm</b> en daarna <b>Installeren</b> (niet "Snelkoppeling").</small></li>
+    <li>Open de Fietsteller voortaan via het nieuwe icoon op je startscherm.</li>
+  </ol>
+  <p><small>Staat er al een oud Fietsteller-icoon? Haal dat eerst weg (lang indrukken → Verwijderen) en probeer het opnieuw.</small></p>
+  <button class="small">OK</button>
+</div></div>
 <div id="lock"><button id="unlock"><b></b>Houd ingedrukt om te ontgrendelen</button></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -618,11 +636,13 @@ if(!document.documentElement.requestFullscreen || inApp) $('fsBtn').style.displa
 let instPrompt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); instPrompt = e; if(!inApp) $('instBtn').style.display = ''; });
 $('instBtn').onclick = async () => {
-  if(!instPrompt){ msg('Kies in Chrome ⋮ → "App installeren".'); return; }
+  if(!instPrompt){ $('instHelp').classList.add('on'); return; }
   instPrompt.prompt(); const r = await instPrompt.userChoice; instPrompt = null;
   if(r.outcome === 'accepted'){ $('instBtn').style.display = 'none'; msg('Geïnstalleerd — open de Fietsteller voortaan via het nieuwe icoon.'); }
 };
 window.addEventListener('appinstalled', () => { $('instBtn').style.display = 'none'; });
+if(inApp) $('instBtn').style.display = 'none';
+$('instHelp').onclick = () => $('instHelp').classList.remove('on');
 $('bigClose').onclick = () => setBig(false);
 $('ovBtn2').onclick = () => setOverlay(!S.overlay);
 $('follow2').onclick = () => setFollow(!follow);
