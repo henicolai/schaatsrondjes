@@ -1,10 +1,10 @@
 {
-  "id": "./?app=schaatsrondjes",
+  "id": "./",
   "name": "Schaatsrondjes",
   "short_name": "Rondjes",
   "description": "Rondjes, afstand en rondetijden tellen op de 400 m ijsbaan",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "./index.html",
+  "scope": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b1620",

@@ -1,9 +1,9 @@
 {
-  "id": "./?app=fietsteller",
+  "id": "./",
   "name": "Fietsteller",
   "short_name": "Fiets",
   "description": "Snelheid, gemiddelde, maximum, tijd en afstand tijdens het fietsen, met fietskaart en bestemming",
-  "start_url": "./?app=fietsteller",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
