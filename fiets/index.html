@@ -142,6 +142,7 @@
   <button class="small" id="headBtn">🧭 Rijrichting</button>
   <button class="small" id="bigBtn">⤢ Grote kaart</button>
   <button class="small" id="fsBtn">⛶ Volledig scherm</button>
+  <button class="small" id="instBtn" style="display:none;background:#2f7cf6;color:#fff">📲 Installeer als app</button>
   <button class="small" id="mapBtn">Kaart verbergen</button>
   <button class="small" id="altBtn">⛰️ Hoogte</button>
   <button class="small" id="gpxBtn" disabled>⬇ GPX</button>
@@ -612,7 +613,16 @@ const inApp = matchMedia('(display-mode: standalone), (display-mode: fullscreen)
 function goFull(){ const d = document.documentElement; if(!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({navigationUI:'hide'}).catch(() => {}); }
 $('fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : goFull();
 document.addEventListener('fullscreenchange', () => { $('fsBtn').textContent = document.fullscreenElement ? '⛶ Scherm normaal' : '⛶ Volledig scherm'; setTimeout(fitMap, 200); });
-if(!document.documentElement.requestFullscreen) $('fsBtn').style.display = 'none';
+if(!document.documentElement.requestFullscreen || inApp) $('fsBtn').style.display = 'none';
+/* Installeren als losse app (zonder adresbalk) */
+let instPrompt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); instPrompt = e; if(!inApp) $('instBtn').style.display = ''; });
+$('instBtn').onclick = async () => {
+  if(!instPrompt){ msg('Kies in Chrome ⋮ → "App installeren".'); return; }
+  instPrompt.prompt(); const r = await instPrompt.userChoice; instPrompt = null;
+  if(r.outcome === 'accepted'){ $('instBtn').style.display = 'none'; msg('Geïnstalleerd — open de Fietsteller voortaan via het nieuwe icoon.'); }
+};
+window.addEventListener('appinstalled', () => { $('instBtn').style.display = 'none'; });
 $('bigClose').onclick = () => setBig(false);
 $('ovBtn2').onclick = () => setOverlay(!S.overlay);
 $('follow2').onclick = () => setFollow(!follow);
