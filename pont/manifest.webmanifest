@@ -1,7 +1,7 @@
 {
   "id": "/schaatsrondjes/pont/",
-  "name": "Ponteller",
-  "short_name": "Ponteller",
+  "name": "Pontteller",
+  "short_name": "Pontteller",
   "description": "Telt automatisch de overtochten van de pont met gps, met vaartijden per dienst",
   "start_url": "./",
   "scope": "./",
