@@ -23,6 +23,22 @@
   .val{font-variant-numeric:tabular-nums;font-weight:700;line-height:1.05;margin-top:3px;font-size:30px}
   .val small{font-size:14px;color:var(--dim);font-weight:500}
   #speedCard{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .nav{display:none;flex-direction:column;align-items:center;justify-content:center;min-width:66px;line-height:1}
+  body.navon .nav{display:flex}
+  .nav svg{width:58px;height:58px;display:block}
+  .navDist{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
+  .nav.near svg path,.nav.near svg polygon{stroke:var(--warn);fill:var(--warn)}
+  .nav.near .navDist{color:var(--warn)}
+  body.navon #speed{font-size:clamp(40px,13.5vw,60px)}
+  body.navon #speed small{font-size:15px}
+  body.navon #speedCard{gap:4px;padding:10px 10px}
+  body.navon #speedCard .side{padding-left:6px;gap:4px}
+  body.navon #speedCard .side .lbl{font-size:9px;letter-spacing:.4px}
+  body.navon #speedCard .side .val{font-size:18px}
+  body.navon #speedCard .side .val small{font-size:10px}
+  body.navon #speedCard .nav{min-width:56px}
+  body.navon #speedCard .nav svg{width:48px;height:48px}
+  #mini .nav svg{width:52px;height:52px}
   #speedCard .side{display:flex;flex-direction:column;gap:8px;text-align:right;padding-left:10px;border-left:1px solid var(--line)}
   #speedCard .side .val{font-size:24px;white-space:nowrap}
   #speedCard .side .val small{font-size:12px}
@@ -57,6 +73,8 @@
      background:rgba(15,26,20,.88);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 12px}
   body.big #mini{flex-wrap:wrap;padding:8px 10px}
   #mini button{flex:1}
+  #miniTxt{display:flex;align-items:center;gap:6px}
+  #miniTxt .mt{flex:1;min-width:0;overflow:hidden}
   #miniTxt{flex:1 1 100%;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;line-height:1.1}
   #miniV{font-size:44px;color:var(--acc);font-weight:800}
   #miniTxt small{font-size:15px;color:var(--dim);font-weight:500}
@@ -95,6 +113,7 @@
 
 <div class="card" id="speedCard">
   <div><div class="lbl">Snelheid</div><div id="speed">0,0<small> km/u</small></div></div>
+  <div class="nav" id="nav"><div id="navArrow"></div><div class="navDist" id="navDist"></div></div>
   <div class="side">
     <div><div class="lbl">Gemiddeld</div><div class="val" id="avg">–<small> km/u</small></div></div>
     <div><div class="lbl">Maximum</div><div class="val" id="max">–<small> km/u</small></div></div>
@@ -134,7 +153,8 @@
 </form>
 <ul id="results"></ul>
 <div id="mapWrap"><div id="map"></div>
-  <div id="mini"><div id="miniTxt"><b id="miniV">0,0</b><small> km/u</small><div id="miniSub">0,00 km</div></div>
+  <div id="mini"><div id="miniTxt"><div class="mt"><b id="miniV">0,0</b><small> km/u</small><div id="miniSub">0,00 km</div></div>
+    <div class="nav" id="miniNav"><div id="miniArrow"></div><div class="navDist" id="miniNavDist"></div></div></div>
     <button class="small" id="ovBtn2">🗺️</button><button class="small" id="follow2">◎</button><button class="small" id="head2">🧭</button>
     <button class="small" id="miniMain">▶</button><button class="small" id="bigClose">✕</button></div>
 </div>
@@ -305,7 +325,7 @@ async function planRoute(reroute){
     const g = await (await fetch(u)).json();
     const route = g.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
     const cum = [0]; for(let i=1;i<route.length;i++) cum.push(cum[i-1] + dist(route[i-1], route[i]));
-    Object.assign(S.dest, {route, cum}); save(true); msg(reroute ? 'Route herberekend.' : '');
+    Object.assign(S.dest, {route, cum, turns: calcTurns(route, cum)}); turnWarned = -1; save(true); msg(reroute ? 'Route herberekend.' : '');
     if(reroute){ if(navigator.vibrate) navigator.vibrate([150, 100, 150]); notify(true); }
   }catch(e){ if(!reroute){ S.dest.route = null; msg('Geen route gevonden — ik toon de afstand hemelsbreed.'); } else msg('Herberekenen mislukt — probeer het zo opnieuw.'); }
   finally { replanning = false; offCount = 0; }
@@ -326,7 +346,63 @@ function remaining(){
   if(d.route.length < 2) bd = dist(pos, d.route[0] || [d.lat, d.lon]);
   lastOff = bd;
   const done = d.cum[bi] + bt * ((d.cum[bi+1] ?? d.cum[bi]) - d.cum[bi]);
+  lastDone = done;
   return Math.max(0, d.cum.at(-1) - done) + bd;
+}
+/* ---------- Afslagpijlen ---------- */
+let lastDone = 0, turnWarned = -1;
+function calcTurns(R, C){
+  const out = [], n = R.length;
+  for(let i=1;i<n-1;i++){
+    let j = i; while(j > 0 && C[i]-C[j] < 15) j--;
+    let k = i; while(k < n-1 && C[k]-C[i] < 15) k++;
+    if(j === i || k === i) continue;
+    const a = ((bearing(R[i], R[k]) - bearing(R[j], R[i]) + 540) % 360) - 180;   // + = rechts
+    if(Math.abs(a) < 35) continue;
+    const last = out.at(-1);
+    if(last && C[i] - last.at < 25){ if(Math.abs(a) > Math.abs(last.ang)) { last.at = C[i]; last.ang = a; } }
+    else out.push({at:C[i], ang:a});
+  }
+  return out;
+}
+function turnName(a){ const r = a > 0 ? 'rechts' : 'links', A = Math.abs(a);
+  return A < 35 ? 'Rechtdoor' : A < 60 ? 'Flauw ' + r : A < 120 ? (a > 0 ? 'Rechtsaf' : 'Linksaf') : A < 160 ? 'Scherp ' + r : 'Keren'; }
+function arrowSvg(a){
+  const A = Math.abs(a);
+  if(A >= 160){                                   // keren
+    const m = a < 0 ? -1 : 1, x1 = 32 + 10*m, x2 = 32 - 10*m;
+    return `<svg viewBox="0 0 64 64"><path d="M${x1} 58 L${x1} 26 A10 10 0 0 0 ${x2} 26 L${x2} 40" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+      <polygon points="${x2-9},38 ${x2+9},38 ${x2},52" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>`;
+  }
+  const r = (A < 35 ? 0 : a) * Math.PI/180, L = A < 35 ? 30 : 24, cx = 32, cy = A < 35 ? 40 : 34;
+  const dx = Math.sin(r), dy = -Math.cos(r), ex = cx + dx*L, ey = cy + dy*L, px = Math.cos(r), py = Math.sin(r);
+  const hp = [[ex+dx*8, ey+dy*8], [ex-dx*5+px*9, ey-dy*5+py*9], [ex-dx*5-px*9, ey-dy*5-py*9]].map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+  const stem = A < 35 ? `M${cx} 60 L${(ex-dx*2).toFixed(1)} ${(ey-dy*2).toFixed(1)}`
+                      : `M${cx} 60 L${cx} ${cy} L${(ex-dx*2).toFixed(1)} ${(ey-dy*2).toFixed(1)}`;
+  return `<svg viewBox="0 0 64 64"><path d="${stem}" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <polygon points="${hp}" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+function fmtM(m){ return m < 1000 ? (Math.round(m/10)*10) + ' m' : nl(m/1000, 1) + ' km'; }
+function navInfo(){
+  const d = S.dest; if(!d || !d.route || !pos) return null;
+  if(!d.turns) d.turns = calcTurns(d.route, d.cum);
+  remaining();
+  const idx = d.turns.findIndex(t => t.at > lastDone + 5);
+  if(idx < 0){ const m = d.cum.at(-1) - lastDone; return {idx:-1, ang:0, m, label: m < 40 ? 'Bestemming' : 'Rechtdoor'}; }
+  const t = d.turns[idx]; return {idx, ang:t.ang, m: t.at - lastDone, label: turnName(t.ang)};
+}
+function renderNav(){
+  const n = navInfo(); document.body.classList.toggle('navon', !!n);
+  if(!n) return;
+  const svg = n.label === 'Bestemming' ? '<svg viewBox="0 0 64 64"><text x="32" y="46" font-size="40" text-anchor="middle">🏁</text></svg>' : arrowSvg(n.ang);
+  const txt = n.label === 'Bestemming' ? 'aankomst' : fmtM(n.m);
+  if($('navArrow').dataset.k !== svg){ $('navArrow').innerHTML = svg; $('miniArrow').innerHTML = svg; $('navArrow').dataset.k = svg; }
+  $('navDist').textContent = txt; $('miniNavDist').textContent = txt;
+  const near = n.idx >= 0 && n.m < 50;
+  $('nav').classList.toggle('near', near); $('miniNav').classList.toggle('near', near);
+  if(S.status === 'run' && n.idx >= 0 && n.m < 120 && n.m > 20 && turnWarned !== n.idx){   // ~100 m van tevoren: horloge + trillen
+    turnWarned = n.idx; if(navigator.vibrate) navigator.vibrate([80, 60, 80]); notify(true, `${n.label} over ${fmtM(n.m)}`);
+  }
 }
 function showDest(fit){
   const d = S.dest; const was = $('destBar').classList.contains('on'); $('destBar').classList.toggle('on', !!d); if(was !== !!d) setTimeout(fitMap, 30);
@@ -346,7 +422,7 @@ function destText(){
   const eta = new Date(Date.now() + rem / v * 1000);
   return {km: nl(rem/1000, rem < 10000 ? 2 : 1), eta: eta.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'})};
 }
-function renderDest(){ const t = destText(); $('destInfo').textContent = t ? `nog ${t.km} km · ~${t.eta}` : 'wacht op gps…'; }
+function renderDest(){ renderNav(); const t = destText(); $('destInfo').textContent = t ? `nog ${t.km} km · ~${t.eta}` : 'wacht op gps…'; }
 $('destClear').onclick = () => { S.dest = null; save(true); showDest(); notify(); };
 
 /* ---------- Rijrichting (kaart draait mee) ---------- */
@@ -462,7 +538,7 @@ function render(){
   $('stopBtn').disabled = !(S.status === 'run' || S.status === 'pause');
   $('gpxBtn').disabled = !S.track.some(s => s.length > 1);
   if(S.dest) renderDest();
-  renderMini();
+  renderMini(); renderNav();
 }
 function renderMini(){
   const t = destText();
@@ -473,7 +549,7 @@ function renderMini(){
 setInterval(() => { $('time').textContent = hms(elapsed()); renderMini(); if(S.status === 'run' && Date.now() - lastMoveAt > 5000){ curV = 0; $('speed').innerHTML = '0,0<small> km/u</small>'; } }, 1000);
 
 /* ---------- Melding → Galaxy Watch ---------- */
-async function notify(buzz){
+async function notify(buzz, turnTxt){
   lastNotify = Date.now();
   if(!('Notification' in window) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
   const reg = await navigator.serviceWorker.ready;
@@ -481,7 +557,9 @@ async function notify(buzz){
   const a = avgKmh(), dt = destText();
   const head = S.status === 'run' ? `${nl(curV*3.6)} km/u · ${nl(S.dist/1000,2)} km`
              : S.status === 'pause' ? `Pauze · ${nl(S.dist/1000,2)} km` : `Klaar · ${nl(S.dist/1000,2)} km`;
-  let body = `${hms(elapsed())} · gem ${a == null ? '–' : nl(a)} · max ${S.maxV ? nl(S.maxV) : '–'} · ↑${Math.round(S.climb)} m`;
+  const nv = S.status === 'run' ? navInfo() : null;
+  const navTxt = turnTxt || (nv && nv.idx >= 0 ? `${nv.label} over ${fmtM(nv.m)}` : '');
+  let body = (navTxt ? '➜ ' + navTxt + '\n' : '') + `${hms(elapsed())} · gem ${a == null ? '–' : nl(a)} · max ${S.maxV ? nl(S.maxV) : '–'} · ↑${Math.round(S.climb)} m`;
   if(dt) body += ` · nog ${dt.km} km (${dt.eta})`;
   const actions = S.status === 'run' ? [{action:'pause', title:'Pauze'}, {action:'stop', title:'Stop'}]
                 : S.status === 'pause' ? [{action:'resume', title:'Doorgaan'}, {action:'stop', title:'Stop'}]
