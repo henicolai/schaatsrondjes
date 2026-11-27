@@ -414,6 +414,7 @@ function showDest(fit){
   viaLayer.clearLayers();
   (d && d.via || []).forEach(v => L.circleMarker(v, {radius:7, color:'#fff', weight:2, fillColor:'#2f7cf6', fillOpacity:1}).addTo(viaLayer));
   [routeCasing, routeLine, routeAnts].forEach(l => l.setLatLngs(d && d.route ? d.route : []));
+  $('gpxBtn').disabled = !(S.track.some(s => s.length > 1) || (d && d.route));
   if(!d) return;
   $('destName').textContent = '→ ' + d.name;
   destMarker = L.marker([d.lat, d.lon]).addTo(map);
@@ -426,7 +427,7 @@ function destText(){
   const eta = new Date(Date.now() + rem / v * 1000);
   return {km: nl(rem/1000, rem < 10000 ? 2 : 1), eta: eta.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'})};
 }
-function renderDest(){ renderNav(); const t = destText(); $('destInfo').textContent = t ? `nog ${t.km} km · ~${t.eta}` : 'wacht op gps…'; }
+function renderDest(){ renderNav(); $('gpxBtn').disabled = !(S.track.some(s => s.length > 1) || (S.dest && S.dest.route)); const t = destText(); $('destInfo').textContent = t ? `nog ${t.km} km · ~${t.eta}` : 'wacht op gps…'; }
 $('destClear').onclick = () => { S.dest = null; save(true); showDest(); notify(); };
 
 /* ---------- Rijrichting (kaart draait mee) ---------- */
@@ -541,7 +542,7 @@ function render(){
   mb.textContent = S.status === 'run' ? 'Pauze' : S.status === 'idle' ? 'Start' : 'Doorgaan';
   mb.classList.toggle('pause', S.status === 'run');
   $('stopBtn').disabled = !(S.status === 'run' || S.status === 'pause');
-  $('gpxBtn').disabled = !S.track.some(s => s.length > 1);
+  $('gpxBtn').disabled = !(S.track.some(s => s.length > 1) || (S.dest && S.dest.route));
   if(S.dest) renderDest();
   renderMini(); renderNav();
 }
@@ -622,12 +623,23 @@ $('ovBtn2').onclick = () => setOverlay(!S.overlay);
 $('follow2').onclick = () => setFollow(!follow);
 $('miniMain').onclick = () => $('mainBtn').onclick();
 $('gpxBtn').onclick = () => {
+  const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const segs = S.track.filter(s => s.length > 1).map(s => '<trkseg>' + s.map(p =>
     `<trkpt lat="${p[0]}" lon="${p[1]}">${p[3] != null ? `<ele>${p[3]}</ele>` : ''}<time>${new Date(p[2]).toISOString()}</time></trkpt>`).join('') + '</trkseg>').join('');
   const start = S.track.find(s => s.length)?.[0]?.[2] || Date.now();
-  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Fietsteller" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Fietsrit ${new Date(start).toLocaleString('nl-NL')}</name>${segs}</trk></gpx>`;
+  let body = segs ? `<trk><name>Fietsrit ${new Date(start).toLocaleString('nl-NL')}</name>${segs}</trk>` : '';
+  const d = S.dest;
+  if(d && d.route){                                   // geplande route ook meenemen
+    body += `<trk><name>Route naar ${esc(d.name)}</name><trkseg>` +
+      d.route.map(p => `<trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"/>`).join('') + '</trkseg></trk>';
+    if(!segs) body = `<wpt lat="${d.lat}" lon="${d.lon}"><name>${esc(d.name)}</name></wpt>` + body;
+  }
+  if(!body) return;
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Fietsteller" xmlns="http://www.topografix.com/GPX/1/1">${body}</gpx>`;
+  const fname = segs ? `fietsrit-${new Date(start).toISOString().slice(0,10)}.gpx`
+                     : `route-${d.name.replace(/[^\w\d]+/g,'-').replace(/^-|-$/g,'').toLowerCase().slice(0,40) || 'fiets'}.gpx`;
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([gpx], {type:'application/gpx+xml'}));
-  a.download = `fietsrit-${new Date(start).toISOString().slice(0,10)}.gpx`; a.click();
+  a.download = fname; a.click();
 };
 
 /* Vergrendelen tegen per ongeluk tikken */
