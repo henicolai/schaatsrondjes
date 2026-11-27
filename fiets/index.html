@@ -592,7 +592,6 @@ function cmd(c){
   if(navigator.vibrate) navigator.vibrate(120);
 }
 $('mainBtn').onclick = async () => {
-  if(!inApp) goFull();
   if('Notification' in window && Notification.permission === 'default'){ try{ await Notification.requestPermission(); }catch(e){} }
   cmd(S.status === 'run' ? 'pause' : S.status === 'idle' ? 'start' : 'resume');
 };
@@ -617,10 +616,6 @@ function goFull(){ const d = document.documentElement; if(!document.fullscreenEl
 $('fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : goFull();
 document.addEventListener('fullscreenchange', () => { $('fsBtn').textContent = document.fullscreenElement ? '⛶ Scherm normaal' : '⛶ Volledig scherm'; setTimeout(fitMap, 200); });
 if(!document.documentElement.requestFullscreen || inApp) $('fsBtn').style.display = 'none';
-if(!inApp){                                         // in Chrome-tabblad: bij eerste tik volledig scherm
-  const first = e => { if(e.target.closest && e.target.closest('input')) return; goFull(); document.removeEventListener('pointerup', first, true); };
-  document.addEventListener('pointerup', first, true);
-}
 
 $('bigClose').onclick = () => setBig(false);
 $('ovBtn2').onclick = () => setOverlay(!S.overlay);
