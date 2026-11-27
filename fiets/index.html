@@ -141,6 +141,7 @@
   <button class="small on" id="followBtn">◎ Volgen</button>
   <button class="small" id="headBtn">🧭 Rijrichting</button>
   <button class="small" id="bigBtn">⤢ Grote kaart</button>
+  <button class="small" id="fsBtn">⛶ Volledig scherm</button>
   <button class="small" id="mapBtn">Kaart verbergen</button>
   <button class="small" id="altBtn">⛰️ Hoogte</button>
   <button class="small" id="gpxBtn" disabled>⬇ GPX</button>
@@ -587,6 +588,7 @@ function cmd(c){
   if(navigator.vibrate) navigator.vibrate(120);
 }
 $('mainBtn').onclick = async () => {
+  if(!inApp) goFull();
   if('Notification' in window && Notification.permission === 'default'){ try{ await Notification.requestPermission(); }catch(e){} }
   cmd(S.status === 'run' ? 'pause' : S.status === 'idle' ? 'start' : 'resume');
 };
@@ -605,6 +607,12 @@ $('headBtn').onclick = () => setHeadUp(!S.headUp);
 $('head2').onclick = () => setHeadUp(!S.headUp);
 $('altBtn').onclick = () => setAlt(!S.showAlt);
 $('bigBtn').onclick = () => setBig(true);
+/* Volledig scherm: verbergt adresbalk en Chrome-knoppen */
+const inApp = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+function goFull(){ const d = document.documentElement; if(!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({navigationUI:'hide'}).catch(() => {}); }
+$('fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : goFull();
+document.addEventListener('fullscreenchange', () => { $('fsBtn').textContent = document.fullscreenElement ? '⛶ Scherm normaal' : '⛶ Volledig scherm'; setTimeout(fitMap, 200); });
+if(!document.documentElement.requestFullscreen) $('fsBtn').style.display = 'none';
 $('bigClose').onclick = () => setBig(false);
 $('ovBtn2').onclick = () => setOverlay(!S.overlay);
 $('follow2').onclick = () => setFollow(!follow);
