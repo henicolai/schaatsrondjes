@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1a24">
+<title>Ponteller</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{--bg:#0a1a24;--card:#122634;--line:#21404f;--txt:#eaf4fb;--dim:#8aa6b8;--water:#4fb3e8;--go:#3ddc97;--stop:#ff6b6b;--sun:#ffd166}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       padding:calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 16px);user-select:none}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.3px}
+  h1 a{color:var(--dim);text-decoration:none;font-size:14px;font-weight:500;margin-left:8px}
+  #gps{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  #gps i{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+  .wide{grid-column:1/-1}
+  .lbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+  .val{font-variant-numeric:tabular-nums;font-weight:700;line-height:1.05;margin-top:4px}
+  #count{font-size:72px;color:var(--sun)}
+  .dirs{display:flex;flex-direction:column;justify-content:center;gap:8px}
+  .dirs .val{font-size:26px}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .row3 .val{font-size:22px}
+  /* rivier-balk */
+  #river{position:relative;height:54px;margin-top:8px}
+  #river .water{position:absolute;left:22%;right:22%;top:14px;height:26px;border-radius:6px;
+     background:repeating-linear-gradient(90deg,#1b4a63 0 10px,#1f5571 10px 20px)}
+  #river .bank{position:absolute;top:6px;width:22%;height:42px;border-radius:8px;background:#2c5b3f;display:flex;align-items:center;justify-content:center;font-size:11px;color:#cfe;text-align:center;line-height:1.1}
+  #river .bank.on{outline:2px solid var(--go)}
+  #bankA{left:0} #bankB{right:0}
+  #boat{position:absolute;top:13px;width:28px;height:28px;margin-left:-14px;font-size:24px;line-height:28px;text-align:center;transition:left .8s linear;left:50%;display:none}
+  #riverTxt{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);margin-top:4px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  button{font:inherit;border:0;border-radius:14px;padding:16px 10px;font-size:18px;font-weight:650;color:var(--txt);background:var(--line)}
+  button:active{transform:scale(.98)}
+  button:disabled{opacity:.35}
+  #startBtn{background:var(--go);color:#062b1b}
+  #startBtn.stop{background:var(--stop);color:#330808}
+  #plusBtn{grid-column:1/-1;background:var(--sun);color:#3a2a00;font-size:24px;padding:22px 10px}
+  .small{font-size:15px;padding:12px 8px}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;margin-top:12px}
+  .seg button{flex:1;background:none;font-size:14px;padding:10px 6px;border-radius:9px;color:var(--dim)}
+  .seg button.on{background:var(--line);color:var(--txt)}
+  #msg{min-height:20px;font-size:13px;color:var(--dim);margin-top:10px;text-align:center}
+  h2{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:18px 0 0;font-weight:600}
+  ol{list-style:none;padding:0;margin:6px 0 0}
+  li{display:flex;justify-content:space-between;gap:8px;padding:9px 4px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:16px}
+  li span:first-child{color:var(--dim)}
+  li .src{font-size:12px;color:var(--dim)}
+  .tools{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .tools button{flex:1;min-width:30%}
+  #lock{position:fixed;inset:0;background:rgba(5,12,18,.55);display:none;align-items:flex-end;justify-content:center;
+        padding-bottom:calc(env(safe-area-inset-bottom) + 40px);z-index:10;touch-action:none}
+  #lock.on{display:flex}
+  #unlock{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:40px;padding:18px 28px;font-size:16px}
+  #unlock b{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,209,102,.25)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⛴️ Ponteller <a href="../">⛸️</a><a href="../fiets/">🚲</a></h1>
+  <div id="gps"><i></i><span>gps uit</span></div>
+</header>
+
+<div class="grid">
+  <div class="card"><div class="lbl">Overtochten</div><div class="val" id="count">0</div></div>
+  <div class="card dirs">
+    <div><div class="lbl" id="lblToB">→ Zuidwest</div><div class="val" id="toB">0</div></div>
+    <div><div class="lbl" id="lblToA">→ Schalkwijk</div><div class="val" id="toA">0</div></div>
+  </div>
+  <div class="card wide">
+    <div id="river">
+      <div class="bank" id="bankA">?</div>
+      <div class="water"></div>
+      <div class="bank" id="bankB">?</div>
+      <div id="boat">⛴️</div>
+    </div>
+    <div id="riverTxt"><span id="where">–</span><span id="since"></span></div>
+  </div>
+  <div class="card wide row3">
+    <div><div class="lbl">Laatste</div><div class="val" id="last">–</div></div>
+    <div><div class="lbl">Gem. vaartijd</div><div class="val" id="avg">–</div></div>
+    <div><div class="lbl">Per uur</div><div class="val" id="rate">–</div></div>
+  </div>
+</div>
+
+<div class="btns">
+  <button id="plusBtn" disabled>+1 overtocht</button>
+  <button id="startBtn">Start dienst</button>
+  <button id="lockBtn">🔒 Vergrendel</button>
+  <button id="undoBtn" class="small">↶ Laatste weg</button>
+  <button id="dockBtn" class="small">📍 Steiger hier</button>
+</div>
+
+<div class="seg" id="mode">
+  <button data-m="gps">Automatisch (gps)</button>
+  <button data-m="manual">Handmatig</button>
+</div>
+<div id="msg"></div>
+
+<h2>Deze dienst · <span id="total">0:00</span></h2>
+<ol id="list"></ol>
+
+<h2>Eerdere diensten</h2>
+<ol id="hist"></ol>
+
+<div class="tools">
+  <button id="csvBtn" class="small">⤓ Exporteer (csv)</button>
+  <button id="swapBtn" class="small">⇄ Namen wisselen</button>
+  <button id="resetBtn" class="small">Steigers wissen</button>
+</div>
+
+<div id="lock"><button id="unlock"><b></b>Houd ingedrukt om te ontgrendelen</button></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'ponteller-v1', TAG = 'ponteller';
+/* Instellingen detectie (rivier ± 60 m breed) */
+const MAXACC = 25;        // gps-punten slechter dan ± 25 m negeren
+const ZONE = 0.25;        // eerste/laatste 25 % van de lijn steiger–steiger telt als "aan de steiger"
+const CONFIRM = 2;        // zoveel opeenvolgende punten in de nieuwe zone nodig
+const MINCROSS = 15000;   // een overtocht duurt minstens 15 s
+const LEARN_MIN = 35;     // tweede steiger moet minstens 35 m van de eerste liggen
+const LEARN_STILL = 15000, LEARN_RAD = 12; // ...en de pont daar 15 s stil (80 % van de punten binnen 12 m)
+const NEAR = 0.12;        // binnen 12 % van de lijn = echt aan de steiger (voor de vaartijd)
+
+let S = load() || {};
+S = Object.assign({running:false, start:null, stop:null, crossings:[], A:null, B:null,
+  names:{A:'Schalkwijk', B:'Zuidwest'}, side:null, mode:'gps', hist:[]}, S);
+let geoId = null, wake = null, lastFix = null, resetArmed = 0;
+let det = {cand:null, n:0, lastSideT:null}, still = [];
+
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
+function msg(t){ $('msg').textContent = t || ''; }
+
+/* ---------- Tijden ---------- */
+function fmtDur(ms){ if(ms==null || !isFinite(ms)) return '–'; const s=Math.round(ms/1000), m=Math.floor(s/60);
+  return m + ':' + String(s%60).padStart(2,'0'); }
+function fmtTotal(ms){ const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60;
+  return (h? h+':'+String(m).padStart(2,'0') : m) + ':' + String(x).padStart(2,'0'); }
+function clock(t){ return new Date(t).toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'}); }
+function day(t){ return new Date(t).toLocaleDateString('nl-NL', {weekday:'short', day:'numeric', month:'short'}); }
+
+/* ---------- Meetkunde ---------- */
+function dist(a, b){
+  const R=6371000, r=Math.PI/180, dLat=(b.lat-a.lat)*r, dLon=(b.lon-a.lon)*r;
+  const h = Math.sin(dLat/2)**2 + Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function xy(p){ const r=Math.PI/180, o=S.A; return {x:(p.lon-o.lon)*r*6371000*Math.cos(o.lat*r), y:(p.lat-o.lat)*r*6371000}; }
+/* f = 0 bij steiger A, 1 bij steiger B; side = afstand dwars op de lijn */
+function project(p){
+  const b = xy(S.B), q = xy(p), L2 = b.x*b.x + b.y*b.y, L = Math.sqrt(L2);
+  return { f:(q.x*b.x + q.y*b.y)/L2, side:Math.abs(q.x*b.y - q.y*b.x)/L, L };
+}
+function zoneOf(p){
+  const {f, side, L} = project(p);
+  if(side > Math.max(80, L)) return {zone:'away', f};
+  return {zone: f < ZONE ? 'A' : f > 1-ZONE ? 'B' : 'mid', f};
+}
+/* Schalkwijk ligt aan de oostkant van het Spaarne: de oostelijkste steiger krijgt die naam */
+function orderSides(){
+  if(S.A && S.B && S.B.lon > S.A.lon){ [S.A, S.B] = [S.B, S.A]; if(S.side) S.side = S.side === 'A' ? 'B' : 'A'; }
+}
+
+/* ---------- Weergave ---------- */
+function stats(){
+  const c = S.crossings, gps = c.filter(x => x.dep), d = gps.map(x => x.arr - x.dep);
+  const end = S.running ? Date.now() : (S.stop || Date.now());
+  const hrs = S.start ? (end - S.start)/3600000 : 0;
+  return { n:c.length, toA:c.filter(x=>x.dir==='A').length, toB:c.filter(x=>x.dir==='B').length,
+    last: d.at(-1), avg: d.length ? d.reduce((a,b)=>a+b,0)/d.length : null,
+    rate: hrs > 0.25 ? (c.length/hrs) : null };
+}
+function render(){
+  const st = stats();
+  $('count').textContent = st.n;
+  $('toA').textContent = st.toA; $('toB').textContent = st.toB;
+  $('lblToA').textContent = '→ ' + S.names.A; $('lblToB').textContent = '→ ' + S.names.B;
+  $('bankA').textContent = S.A ? S.names.A : '?'; $('bankB').textContent = S.B ? S.names.B : '?';
+  $('last').textContent = fmtDur(st.last);
+  $('avg').textContent = fmtDur(st.avg);
+  $('rate').textContent = st.rate ? st.rate.toFixed(1).replace('.', ',') : '–';
+  $('list').innerHTML = S.crossings.map((x,i) => `<li><span>${i+1}. ${clock(x.arr)} → ${S.names[x.dir]}</span>`+
+     `<span>${x.dep ? fmtDur(x.arr - x.dep) : '<span class="src">'+({watch:'horloge', manual:'handmatig', gps:'eerste'}[x.src])+'</span>'}</span></li>`).reverse().join('');
+  $('hist').innerHTML = S.hist.slice(-30).map(h => `<li><span>${day(h.start)} ${clock(h.start)}–${clock(h.stop)}</span><span>${h.n} ×</span></li>`).reverse().join('')
+     || '<li><span>nog geen</span><span></span></li>';
+  const btn = $('startBtn');
+  btn.textContent = S.running ? 'Stop dienst' : 'Start dienst';
+  btn.classList.toggle('stop', S.running);
+  $('plusBtn').disabled = !S.running;
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === S.mode));
+  $('bankA').classList.toggle('on', S.side === 'A'); $('bankB').classList.toggle('on', S.side === 'B');
+  tick();
+}
+function tick(){
+  $('total').textContent = S.start ? fmtTotal((S.running ? Date.now() : S.stop) - S.start) : '0:00';
+  const lastC = S.crossings.at(-1);
+  $('since').textContent = S.running && lastC && S.side ? 'aan wal ' + fmtDur(Date.now() - lastC.arr) : '';
+}
+setInterval(tick, 1000);
+function showBoat(p){
+  const boat = $('boat');
+  if(!S.A || !S.B || !p){ boat.style.display = 'none'; return; }
+  const {zone, f} = zoneOf(p);
+  boat.style.display = 'block';
+  boat.style.left = (22 + 56 * Math.min(1.1, Math.max(-0.1, f))) + '%';
+  $('where').textContent = zone === 'A' ? 'bij ' + S.names.A : zone === 'B' ? 'bij ' + S.names.B : zone === 'mid' ? 'onderweg' : 'buiten het veer';
+}
+
+/* ---------- GPS ---------- */
+function gpsStatus(text, color){ $('gps').querySelector('span').textContent = text; $('gps').querySelector('i').style.background = color; }
+
+function onFix(pos){
+  const {latitude:lat, longitude:lon, accuracy:acc} = pos.coords;
+  let t = pos.timestamp; if(Math.abs(t - Date.now()) > 5000) t = Date.now();
+  const p = {lat, lon};
+  lastFix = {lat, lon, acc, t};
+  gpsStatus(`± ${Math.round(acc)} m`, acc <= 10 ? 'var(--go)' : acc <= MAXACC ? 'var(--sun)' : 'var(--stop)');
+  if(acc > MAXACC) return;
+  if(S.running && S.mode === 'gps' && acc <= 15) learn(p, t);
+  showBoat(p);
+  if(!S.running || S.mode !== 'gps' || !S.A || !S.B) return;
+
+  const {zone, f} = zoneOf(p);
+  const nearA = f < NEAR, nearB = f > 1 - NEAR;
+  if(det.pending && (det.pending.dir === 'A' ? nearA : nearB)){   // aankomst echt bij de steiger: tijd bijwerken
+    if(t - det.pending.arr < 60000) det.pending.arr = t;
+    det.pending = null; save(); render();
+  }
+  if(S.side && (S.side === 'A' ? nearA : nearB)) det.nearT = t;
+  if(S.side && zone === S.side) refine(S.side, p);
+  if(!S.side){                                   // eerste keer: aan welke kant liggen we?
+    if(zone === 'A' || zone === 'B'){ S.side = zone; det.lastSideT = t; save(); render(); }
+    return;
+  }
+  if(zone === S.side){ det.lastSideT = t; det.cand = null; det.n = 0; return; }   // nog/weer aan dezelfde kant
+  if(zone === 'A' || zone === 'B'){              // aan de overkant?
+    if(det.cand === zone) det.n++; else { det.cand = zone; det.n = 1; det.firstT = t; }
+    if(det.n >= CONFIRM) arrive(zone, det.nearT || det.lastSideT, det.firstT, 'gps');
+  } else { det.cand = null; det.n = 0; }
+}
+
+/* Steigers leren: eerste = waar je de dienst start, tweede = eerste plek ≥ 30 m verder waar de pont 15 s stil ligt */
+/* Steigerpositie verfijnen met punten die er dichtbij liggen (lopend gemiddelde, max. 40 punten) */
+function refine(k, p){
+  if(!S[k] || dist(p, S[k]) > 15 || (S[k+'n'] || 1) >= 40) return;
+  const n = (S[k+'n'] || 1) + 1;
+  S[k] = {lat: S[k].lat + (p.lat - S[k].lat)/n, lon: S[k].lon + (p.lon - S[k].lon)/n}; S[k+'n'] = n;
+}
+function learn(p, t){
+  if(S.A && S.B) return;
+  if(!S.A){ S.A = p; S.An = 1; save(); render(); msg('Steiger 1 vastgelegd. Vaar over — de overkant wordt vanzelf herkend.'); return; }
+  refine('A', p);                                  // nog bij steiger 1: positie middelen
+  still.push({...p, t}); still = still.filter(q => t - q.t <= LEARN_STILL);
+  if(still.length < 5 || t - still[0].t < LEARN_STILL - 2000) return;
+  const m = {lat: still.reduce((a,q)=>a+q.lat,0)/still.length, lon: still.reduce((a,q)=>a+q.lon,0)/still.length};
+  const close = still.filter(q => dist(q, m) <= LEARN_RAD).length;
+  const avg = a => ({lat: a.reduce((x,q)=>x+q.lat,0)/a.length, lon: a.reduce((x,q)=>x+q.lon,0)/a.length});
+  const h = Math.floor(still.length/2), drift = dist(avg(still.slice(0,h)), avg(still.slice(h)));   // beweegt de pont nog?
+  if(close >= 0.8 * still.length && drift < 4 && dist(m, S.A) >= LEARN_MIN){
+    S.B = m; S.Bn = 1; orderSides();
+    const {zone} = zoneOf(m); S.side = zone === 'A' || zone === 'B' ? zone : null;
+    // de eerste overtocht (die nodig was om te leren) telt ook mee
+    if(S.side) S.crossings.push({dir:S.side, dep:null, arr:still[0].t, src:'gps'});
+    still = []; save(); render(); notify();
+    msg(`Beide steigers bekend (${Math.round(dist(S.A, S.B))} m uit elkaar). Vanaf nu wordt automatisch geteld.`);
+  }
+}
+
+function arrive(zone, dep, arr, src){
+  const prev = S.crossings.at(-1);
+  if(src === 'gps' && prev && arr - prev.arr < MINCROSS){ S.side = zone; det.cand = null; det.n = 0; save(); return; }
+  S.crossings.push({dir:zone, dep: src === 'gps' ? dep : null, arr, src});
+  S.side = zone; det = {cand:null, n:0, lastSideT:arr, nearT:null, pending: src === 'gps' ? S.crossings.at(-1) : null};
+  save(); render();
+  if(navigator.vibrate) navigator.vibrate(150);
+  notify();
+}
+
+function startGps(){
+  if(geoId != null || !('geolocation' in navigator)) return;
+  gpsStatus('zoeken…', 'var(--sun)');
+  geoId = navigator.geolocation.watchPosition(onFix, e => {
+    gpsStatus('geen gps', 'var(--stop)');
+    msg(e.code === 1 ? 'Locatietoegang geweigerd — sta locatie toe of kies Handmatig.' : 'Geen gps-signaal.');
+  }, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+}
+function stopGps(){ if(geoId != null){ navigator.geolocation.clearWatch(geoId); geoId = null; } gpsStatus('gps uit', '#555'); }
+
+/* Handmatig / horloge: richting wisselt steeds */
+function manualPlus(src){
+  if(!S.running) return;
+  const prev = S.crossings.at(-1);
+  if(prev && Date.now() - prev.arr < 3000) return;          // dubbele tik negeren
+  const to = S.side ? (S.side === 'A' ? 'B' : 'A') : (prev ? (prev.dir === 'A' ? 'B' : 'A') : 'B');
+  arrive(to, null, Date.now(), src);
+}
+
+/* ---------- Melding (wordt gespiegeld naar de Galaxy Watch) ---------- */
+async function notify(final){
+  if(!('Notification' in window) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
+  const reg = await navigator.serviceWorker.ready;
+  const st = stats(), lastC = S.crossings.at(-1);
+  const title = `${st.n} overtochten` + (lastC ? ` · laatst → ${S.names[lastC.dir]}` : '');
+  const body = `→ ${S.names.B} ${st.toB} · → ${S.names.A} ${st.toA}` + (st.avg ? ` · gem. ${fmtDur(st.avg)}` : '');
+  reg.showNotification(final ? 'Dienst klaar · ' + title : title, {
+    body: final ? `${body} · ${fmtTotal(S.stop - S.start)}` : body,
+    tag: TAG, renotify: !final, silent: !!final, requireInteraction: !final,
+    icon: 'icon-192.png', badge: 'icon-192.png',
+    actions: final ? [] : [{action:'plus', title:'+1 overtocht'}]
+  });
+}
+
+/* ---------- Scherm aan houden ---------- */
+async function keepAwake(){ try{ if('wakeLock' in navigator && S.running) wake = await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') keepAwake(); });
+
+/* ---------- Knoppen ---------- */
+$('startBtn').onclick = async () => {
+  if(S.running){
+    S.running = false; S.stop = Date.now();
+    S.hist.push({start:S.start, stop:S.stop, n:S.crossings.length}); S.hist = S.hist.slice(-100);
+    save(); stopGps(); try{ wake && wake.release(); }catch(e){} wake = null;
+    render(); notify(true); msg('Dienst gestopt.');
+    return;
+  }
+  if('Notification' in window && Notification.permission === 'default'){ try{ await Notification.requestPermission(); }catch(e){} }
+  Object.assign(S, {running:true, start:Date.now(), stop:null, crossings:[], side:null});
+  det = {cand:null, n:0, lastSideT:null}; still = []; save();
+  if(S.mode === 'gps'){
+    startGps();
+    msg(S.A && S.B ? 'Automatisch tellen aan. Telefoon met scherm aan in het stuurhuis laten liggen.' : 'Start aan de steiger — die wordt steiger 1.');
+  } else msg('Tik +1 hier of op je horloge bij elke overtocht.');
+  keepAwake(); render(); notify();
+};
+$('plusBtn').onclick = () => manualPlus('manual');
+$('undoBtn').onclick = () => {
+  if(!S.crossings.length) return;
+  const x = S.crossings.pop(); S.side = x.dir === 'A' ? 'B' : 'A';
+  if(S.mode === 'gps') S.side = null;                       // gps bepaalt opnieuw waar we liggen
+  save(); render(); notify(!S.running);
+};
+$('dockBtn').onclick = () => {
+  if(!lastFix || Date.now() - lastFix.t > 15000){ msg('Nog geen (verse) gps-positie.'); return; }
+  if(lastFix.acc > 15){ msg(`Gps nog te onnauwkeurig (± ${Math.round(lastFix.acc)} m). Even wachten.`); return; }
+  const p = {lat:lastFix.lat, lon:lastFix.lon};
+  if(!S.A){ S.A = p; S.An = 10; }
+  else if(!S.B){ if(dist(p, S.A) < LEARN_MIN){ msg('Te dicht bij steiger 1 — leg eerst aan de overkant aan.'); return; } S.B = p; S.Bn = 10; }
+  else if(dist(p, S.A) < dist(p, S.B)){ S.A = p; S.An = 10; } else { S.B = p; S.Bn = 10; }
+  orderSides(); S.side = null; save(); render(); showBoat(p);
+  msg(S.A && S.B ? `Steiger vastgelegd. Afstand steiger–steiger ${Math.round(dist(S.A, S.B))} m.` : 'Steiger 1 vastgelegd; zet de andere aan de overkant.');
+};
+$('resetBtn').onclick = () => {
+  if(Date.now() - resetArmed > 3000){ resetArmed = Date.now(); msg('Tik nogmaals om beide steigers te wissen.'); return; }
+  S.A = S.B = null; S.An = S.Bn = 0; S.side = null; still = []; save(); render(); showBoat(null); $('where').textContent = '–';
+  msg('Steigers gewist. Ze worden opnieuw geleerd bij de volgende dienst (of met 📍 Steiger hier).');
+};
+$('swapBtn').onclick = () => { S.names = {A:S.names.B, B:S.names.A}; save(); render(); };
+$('csvBtn').onclick = async () => {
+  const rows = [['nr','aankomst','naar','vaartijd_s','bron']].concat(S.crossings.map((x,i) =>
+    [i+1, new Date(x.arr).toLocaleString('nl-NL'), S.names[x.dir], x.dep ? Math.round((x.arr-x.dep)/1000) : '', x.src]));
+  const csv = rows.map(r => r.join(';')).join('\n');
+  const name = `pont-${S.start ? new Date(S.start).toISOString().slice(0,10) : 'dienst'}.csv`;
+  const file = new File([csv], name, {type:'text/csv'});
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:name}); return; } }catch(e){ return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
+};
+document.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
+  S.mode = b.dataset.m; save();
+  if(S.running){ S.mode === 'gps' ? startGps() : stopGps(); }
+  render();
+});
+
+/* Vergrendelen tegen per ongeluk tikken */
+$('lockBtn').onclick = () => $('lock').classList.add('on');
+(() => {
+  const u = $('unlock'), bar = u.querySelector('b'); let t0 = 0, raf = 0;
+  const step = () => { const p = Math.min(1, (Date.now() - t0) / 1200); bar.style.width = p*100 + '%';
+    if(p >= 1){ $('lock').classList.remove('on'); bar.style.width = 0; return; } raf = requestAnimationFrame(step); };
+  u.addEventListener('pointerdown', e => { e.preventDefault(); t0 = Date.now(); raf = requestAnimationFrame(step); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => u.addEventListener(ev, () => { cancelAnimationFrame(raf); bar.style.width = 0; }));
+})();
+
+/* Service worker: offline + knop in de melding */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js');
+  navigator.serviceWorker.addEventListener('message', e => {
+    if(e.data && e.data.type === 'pontcmd' && e.data.cmd === 'plus') manualPlus('watch');
+  });
+}
+
+/* Herstel na herladen */
+if(S.running){ S.side = S.mode === 'gps' ? null : S.side; if(S.mode === 'gps') startGps(); keepAwake(); }
+render();
+</script>
+</body>
+</html>
