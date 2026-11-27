@@ -60,7 +60,7 @@
   .small{font-size:14px;padding:9px 8px;border-radius:10px}
   .tools{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
   .tools button.on{background:var(--acc);color:#0b2410}
-  #map{height:62vh;min-height:260px;border-radius:16px;margin-top:8px;border:1px solid var(--line);background:#1c2a22}
+  #map{contain:paint;isolation:isolate;height:62vh;min-height:260px;border-radius:16px;margin-top:8px;border:1px solid var(--line);background:#1c2a22}
   #map.hide{display:none}
   body:not(.alt) .altc{display:none}
   .tools button#headBtn.on,#mini button#head2.on{background:var(--acc);color:#0b2410}
@@ -85,6 +85,7 @@
   .search{display:flex;gap:5px;margin-top:6px}
   .search input{flex:1;min-width:0;font:inherit;font-size:16px;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:11px;padding:10px}
   #results{list-style:none;margin:6px 0 0;padding:0}
+  #results{position:relative;z-index:5;background:var(--bg)}
   #results li{padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px}
   #msg{min-height:18px;font-size:13px;color:var(--dim);margin-top:8px;text-align:center}
   #lock{position:fixed;inset:0;background:rgba(5,12,8,.5);display:none;align-items:flex-end;justify-content:center;
@@ -217,6 +218,7 @@ function drawTrack(){ trackLine.setLatLngs(S.track.map(seg => seg.map(p => [p[0]
 /* ---------- Bestemming ---------- */
 $('searchForm').onsubmit = async e => {
   e.preventDefault(); const q = $('q').value.trim(); if(!q) return;
+  $('q').blur();                                   // toetsenbord dicht
   $('results').innerHTML = '';
   const nums = q.replace(/knooppunt(en)?|kp/gi, ' ').trim().split(/[\s,\-–>]+/).filter(Boolean);
   if(nums.length && nums.every(n => /^\d{1,3}$/.test(n))) return knoop(nums);
@@ -228,6 +230,7 @@ $('searchForm').onsubmit = async e => {
     if(!list.length){ msg('Niets gevonden.'); return; }
     msg('');
     $('results').innerHTML = list.map((x,i) => `<li data-i="${i}">${x.display_name}</li>`).join('');
+    setTimeout(() => $('searchForm').scrollIntoView({behavior:'smooth', block:'start'}), 350);
     $('results').querySelectorAll('li').forEach(li => li.onclick = () => {
       const x = list[+li.dataset.i]; $('results').innerHTML = ''; $('q').value = '';
       setDest(x.display_name.split(',').slice(0,2).join(','), +x.lat, +x.lon);
@@ -448,12 +451,13 @@ function fitMap(){
     $('map').style.height = '';
     document.documentElement.style.setProperty('--barH', ($('mini').offsetHeight + $('mini').offsetTop + 6) + 'px');
   } else if(!S.mapHidden){
-    const m = $('map'); m.style.height = Math.max(260, window.innerHeight - m.getBoundingClientRect().top - window.scrollY - 12) + 'px';
+    const m = $('map'); m.style.height = Math.max(260, window.innerHeight - (m.getBoundingClientRect().top + window.scrollY) - 12) + 'px';
   }
   map.invalidateSize({pan:false});
   if(follow && pos) map.setView(pos, map.getZoom(), {animate:false});
 }
-window.addEventListener('resize', () => setTimeout(fitMap, 100));
+window.addEventListener('resize', () => { const a = document.activeElement; if(a && a.tagName === 'INPUT') return; setTimeout(fitMap, 100); });   // niet bij openen toetsenbord
+$('q').addEventListener('blur', () => setTimeout(fitMap, 300));
 /* ---------- Demping snelheid ---------- */
 let smoothT = 0, altSm = null, altRef = null;
 function smooth(v, t){
