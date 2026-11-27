@@ -146,7 +146,7 @@
   <button class="small" id="mapBtn">Kaart verbergen</button>
   <button class="small" id="altBtn">⛰️ Hoogte</button>
   <button class="small" id="gpxBtn" disabled>⬇ GPX</button>
-  <button class="small" id="newBtn">Nieuwe rit</button>
+  <button class="small" id="newBtn">↺ Nw rit</button>
 </div>
 
 <form class="search" id="searchForm">
@@ -599,7 +599,7 @@ $('mainBtn').onclick = async () => {
 $('stopBtn').onclick = () => cmd('stop');
 let newArmed = 0;
 $('newBtn').onclick = () => {
-  if(S.status !== 'idle' && Date.now() - newArmed > 3000){ newArmed = Date.now(); msg('Tik nogmaals op Nieuwe rit om de huidige rit te wissen.'); return; }
+  if(S.status !== 'idle' && Date.now() - newArmed > 3000){ newArmed = Date.now(); msg('Tik nogmaals op Nw rit om de huidige rit te wissen.'); return; }
   Object.assign(S, {status:'idle', elapsed:0, runSince:null, dist:0, maxV:0, moving:0, climb:0, track:[]});
   last = null; curV = 0; altRef = null; drawTrack(); save(true); render(); notify(); msg('Klaar voor een nieuwe rit.');
 };
